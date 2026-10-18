@@ -65,6 +65,7 @@
 | `ACCESS_AUD` | 第 3 步的應用程式 AUD 標籤 |
 | `GUEST_DAILY_LIMIT` | （選填）外部人員每天語音／AI 次數，預設 50 |
 | `RESEND_API_KEY` | （選填）要 Email 通知時才需要，見下方 |
+| `ACCESS_SERVICE_TOKEN_ID` | （選填）本機 Claude 用的服務權杖 Client ID，見「本機 Claude」 |
 
 ### 3. Cloudflare Access：只有你能登入，分享連結不用登入
 
@@ -86,6 +87,52 @@
 ### Email 通知（選填）
 
 不設定也可以：客戶核准、要求修改、次數用完時，工具上方都會跳出通知。想同時收 Email：到 https://resend.com 免費註冊（用你的 `OWNER_EMAILS` 第一個 Email），建立 API Key 填到 `RESEND_API_KEY`。
+
+## 本機 Claude：自動上傳審片檔、讀新意見
+
+`local-claude/clipnote-review/` 是給本機 Claude（Claude Code／Claude 桌面版）用的 skill。裝好之後可以直接說「把這版丟到審片資料夾」「有沒有新的審片意見」。本機 Claude 會：
+
+- 把輸出的影片轉成 720p 審片檔，照命名規則放進「片語審片」。
+- 讀新的意見，逐則跟你確認做法，確認之前不會動手改。
+- 改好且你同意後標記「已修改」。
+
+### 設定（約 10 分鐘）
+
+1. **Cloudflare 服務權杖**（讓本機 Claude 不用收 Email 驗證碼也能讀資料）
+   - Zero Trust →「Access」→「Service Auth」→「Service Tokens」→「Create Service Token」，名稱 `local-claude`。
+   - 複製 **Client ID** 和 **Client Secret**。Secret 只會顯示這一次。
+   - 「Access」→「應用程式」→ 打開片語的擁有者應用程式（不是 `/s` 那個）→「政策」→ 新增政策：動作 **Service Auth**，Include →「Service Token」→ `local-claude`。
+   - Pages 專案的「變數和祕密」新增 `ACCESS_SERVICE_TOKEN_ID` = Client ID，然後重新部署。
+2. **Google Drive 電腦版**：安裝並登入，讓「片語審片」資料夾同步到電腦上。
+3. **安裝 skill**：
+   ```bash
+   mkdir -p ~/.claude/skills ~/.config/clipnote
+   cp -r local-claude/clipnote-review ~/.claude/skills/
+   cp local-claude/clipnote-review/config.env.example ~/.config/clipnote/config.env
+   chmod 600 ~/.config/clipnote/config.env
+   ```
+   打開 `~/.config/clipnote/config.env`，填入片語網址、Client ID、Client Secret，以及「片語審片」在電腦上的路徑。
+4. 測試：`python3 ~/.claude/skills/clipnote-review/clipnote.py check`
+
+想每次開新對話就自動檢查有沒有新意見，請參考 `SKILL.md` 的「開工時自動檢查」。
+
+### 雲端資料夾結構
+
+```
+我的雲端硬碟/
+├─ 片語審片/                          ← DRIVE_FOLDER：片語只讀這一層，只放審片小檔
+│  ├─ 20261018_夏日新品_形象片_v2.mp4
+│  ├─ 20261017_手沖咖啡_Reels_v1.mp4
+│  └─ _封存/2026-10/                   ← 核准或被新版取代的檔案（片語不會列出）
+└─ 專案/2026_夏日新品/                 ← 不分享給片語
+   ├─ 01_素材/
+   ├─ 02_專案檔/
+   └─ 03_輸出/                         ← 母帶、交片檔
+```
+
+- 檔名：`YYYYMMDD_專案_內容_v版本.mp4`；直式片在內容加 `Reels`／`Shorts`／`916`。
+- 新版本一律存成新檔（v3 不要覆蓋 v2），否則舊版的意見會掛到新版上。
+- 審片檔用 720p H.264 mp4；母帶、ProRes、4K 留在 `專案/…/03_輸出/`。
 
 ## 安全設計
 
@@ -113,6 +160,7 @@ public/icons/              App icon
 functions/api/[[path]].js  擁有者 API（需 Cloudflare Access 登入）
 functions/s/[[path]].js    分享連結頁面與 API
 lib/                       後端共用：驗證、Google Drive、語音／AI、資料庫
+local-claude/              本機 Claude 用的 skill（SKILL.md）與小工具 clipnote.py
 ```
 
 ## 限制

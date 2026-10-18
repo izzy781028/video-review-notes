@@ -129,7 +129,23 @@
     body.portrait #playerWrap > #timeline { margin-top: 0; }
     body.portrait .transport { flex-wrap: wrap; width: 100%; }
   }
-  #stage { scroll-margin-top: 84px; }
+  #stage, #stageSpacer { scroll-margin-top: var(--hdr, 84px); }
+  /* the video never moves while scrolling */
+  @media (min-width: 901px) {
+    /* desktop: the player column stays put; anything taller scrolls inside it, under the video */
+    #playerPanel { position: sticky; top: 84px; align-self: start; max-height: calc(100vh - 100px); overflow-y: auto; overscroll-behavior: contain; }
+    #stage { position: sticky; top: 0; z-index: 4; }
+  }
+  @media (max-width: 900px) {
+    /* phone / tablet: once scrolled past, the video pins under the header (spacer keeps the layout from jumping) */
+    #playerPanel { -webkit-backdrop-filter: none; backdrop-filter: none; }
+    body.stuck #stage { position: fixed; top: var(--hdr, 76px); z-index: 8; padding: 6px; border-radius: 22px;
+      left: max(8px, env(safe-area-inset-left, 0px)); right: max(8px, env(safe-area-inset-right, 0px));
+      background: var(--sheet-bg); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--glass-border); box-shadow: var(--shadow); }
+    body.stuck video { max-height: 34vh; }
+    body.portrait.stuck video { height: 34vh; }
+  }
   /* collapsible notes column */
   #listRail { display: none; }
   @media (min-width: 901px) {
@@ -175,6 +191,8 @@
   .note .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; outline: none; border-radius: 4px; }
   .note .text:focus { box-shadow: 0 0 0 2px var(--accent); }
   .note .actions { display: flex; gap: 6px; margin-top: 4px; }
+  .note .decision { margin-top: 4px; color: var(--ink-2); }
+  .note:has(.decision .fresh) .text { color: var(--muted); }
   .note .actions button { padding: 3px 10px; font-size: 12px; box-shadow: none; }
   dialog { border-radius: 24px; background: var(--sheet-bg); color: var(--ink); width: min(560px, calc(100vw - 32px)); padding: 20px; }
   dialog::backdrop { background: rgba(40,36,80,.28); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
@@ -341,6 +359,7 @@
     </div>
     <input id="videoFile" type="file" accept="video/*" hidden>
     <div id="playerWrap" hidden>
+      <div id="stageSpacer" aria-hidden="true"></div>
       <div id="stage">
         <video id="video" controls playsinline></video>
         <div id="stageHit" title="點一下標出位置"></div>
@@ -896,6 +915,24 @@
   video.addEventListener('seeked', refreshPt);
   window.addEventListener('resize', refreshPt);
 
+  // phones: pin the video under the header once the page scrolls past it
+  const narrow = matchMedia('(max-width: 900px)');
+  let pinFrame = 0;
+  function updatePin() {
+    pinFrame = 0;
+    const hdr = Math.round(document.querySelector('header').getBoundingClientRect().bottom) + 8;
+    document.documentElement.style.setProperty('--hdr', hdr + 'px');
+    const spacer = $('#stageSpacer'), stuck = document.body.classList.contains('stuck');
+    const want = narrow.matches && !$('#playerWrap').hidden && !!video.src && spacer.getBoundingClientRect().top < hdr;
+    if (want && !stuck) spacer.style.height = $('#stage').offsetHeight + 'px';
+    if (!want) spacer.style.height = '0px';
+    if (want !== stuck) { document.body.classList.toggle('stuck', want); refreshPt(); }
+  }
+  const schedulePin = () => { if (!pinFrame) pinFrame = requestAnimationFrame(updatePin); };
+  window.addEventListener('scroll', schedulePin, { passive: true });
+  window.addEventListener('resize', schedulePin);
+  narrow.addEventListener?.('change', schedulePin);
+
   function grabThumb(pt) {
     if (!video.videoWidth) return '';
     const c = document.createElement('canvas'), k = 320 / Math.max(video.videoWidth, video.videoHeight);
@@ -922,7 +959,7 @@
     $('#btnRaw').hidden = !editing.raw;
     $('#editor').classList.add('open');
     document.body.classList.add('editing');
-    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => { $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' }); refreshPt(); }, 50);
+    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => { $('#stageSpacer').scrollIntoView({ behavior: 'smooth', block: 'start' }); refreshPt(); }, 50);
     else setTimeout(() => { $('#editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); refreshPt(); }, 50);
   }
   function syncGeneral() {
@@ -1152,6 +1189,7 @@
             ${n.author && n.author !== 'owner' && api.mode === 'owner' ? '<span class="chip st-changes">外部</span>' : ''}
           </div>
           <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
+          ${n.decision && api.mode !== 'guest' ? `<div class="small decision"><span class="chip ${{ reject: 'fresh', adjust: 'st-changes', accept: 'st-approved' }[n.decision]}">${{ reject: '不改', adjust: '改法調整', accept: '照改' }[n.decision]}</span>${n.decisionNote ? ' ' + esc(n.decisionNote) : ''}</div>` : ''}
           ${n.raw ? `<details class="small muted"><summary>原始口述</summary>${esc(n.raw)}</details>` : ''}
           <div class="actions">
             ${api.mode === 'guest' ? '' : `<button data-act="done">${n.done ? ic('undo') + '未完成' : ic('check') + '已修改'}</button>`}
@@ -1176,6 +1214,7 @@
     document.body.classList.toggle('listCollapsed', on); store.set('vrn.listCollapsed', on);
     $('#btnCollapse').innerHTML = ic(on ? 'panelOpen' : 'panelClose');
     $('#btnCollapse').title = on ? '展開修改清單' : '收起修改清單';
+    $('#btnCollapse').setAttribute('aria-label', $('#btnCollapse').title);
     refreshPt();
   };
   $('#btnCollapse').onclick = () => setCollapsed(!document.body.classList.contains('listCollapsed'));
@@ -1362,29 +1401,117 @@
     return out;
   }
   const reviewers = () => [...new Set(notes.map(n => n.by).filter(Boolean))].join('、');
-  function reportHtml(shots) {
+  // ---------- revision document (shared by the HTML / PDF report and the Word file) ----------
+  const DECISION = { accept: '照改', adjust: '改法調整', reject: '不改' };
+  const pad2 = n => String(n).padStart(2, '0');
+  const fmtDate = d => `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  function docData() {
     const general = notes.filter(n => n.general), timed = timedNotes();
-    const st = n => `<span class="st ${n.done ? 'ok' : ''}">${n.done ? '已修改' : '待修改'}</span>`;
-    const by = n => n.by ? `<div class="by">— ${esc(n.by)}</div>` : '';
+    const closed = n => n.done || n.decision === 'reject';
+    const cats = {};
+    notes.forEach(n => { if (n.cat) cats[n.cat] = (cats[n.cat] || 0) + 1; });
+    const dur = video.duration ? `${Math.floor(video.duration / 60)}:${pad2(Math.round(video.duration % 60))}` : '';
+    return {
+      title: videoName.replace(/\.[^.]+$/, '') || '影片',
+      meta: [
+        ['影片檔名', videoName],
+        ['規格', [video.videoWidth ? `${video.videoWidth}×${video.videoHeight}` : '', `${$('#fps').value} fps`, dur].filter(Boolean).join('　')],
+        ['審核狀態', project.info ? STATUS[project.info.status || 'review'] + (project.info.statusBy ? `（${project.info.statusBy}）` : '') : '—'],
+        ['審片人', reviewers() || '—'],
+        ['產出時間', fmtDate(new Date())],
+        ['起始時間碼', $('#startTc').value],
+      ],
+      stats: [['全部意見', notes.length], ['待修改', notes.filter(n => !closed(n)).length], ['已完成', notes.filter(closed).length], ['整體意見', general.length]],
+      cats: Object.entries(cats).sort((x, y) => y[1] - x[1]),
+      general, timed,
+      statusOf: n => n.decision === 'reject' ? ['☒', '不修改'] : n.done ? ['☑', '已修改'] : ['☐', '待修改'],
+      decisionOf: n => n.decision && api.mode !== 'guest' ? DECISION[n.decision] + (n.decisionNote ? `：${n.decisionNote}` : '') : '',
+    };
+  }
+  let iconSvg = null;
+  async function brandIcon() {
+    if (iconSvg === null) iconSvg = await fetch('icons/icon.svg').then(r => r.ok ? r.text() : '').catch(() => '');
+    return iconSvg;
+  }
+  async function iconPng(px) { // the Word file needs a raster logo
+    const svg = await brandIcon();
+    if (!svg) return null;
+    const img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    try { await img.decode(); } catch { return null; }
+    const c = document.createElement('canvas'); c.width = c.height = px;
+    c.getContext('2d').drawImage(img, 0, 0, px, px);
+    return Uint8Array.from(atob(c.toDataURL('image/png').split(',')[1]), ch => ch.charCodeAt(0));
+  }
+  async function reportHtml(shots) {
+    const D = docData(), svg = await brandIcon();
+    const logo = svg ? `<img class="logo" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}" alt="">` : '';
+    const chip = (t, cls = '') => `<span class="chip ${cls}">${esc(t)}</span>`;
+    const status = n => { const [box, t] = D.statusOf(n); return `<span class="st ${n.done ? 'ok' : n.decision === 'reject' ? 'no' : ''}">${box} ${t}</span>`; };
+    const extra = n => [n.by ? `<span class="by">${esc(n.by)}</span>` : '', D.decisionOf(n) ? `<span class="dec">處理：${esc(D.decisionOf(n))}</span>` : ''].join('');
+    let sec = 0;
+    const head = t => `<h2><span class="no">${pad2(++sec)}</span>${t}</h2>`;
     return `<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(base())}</title><style>
-body{font:14px/1.6 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1c1917;background:#fff;max-width:1000px;margin:0 auto;padding:24px 16px}
-h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 10px;border-bottom:2px solid #1c1917;padding-bottom:4px}
-.meta{color:#57534e;font-size:13px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d6d3d1;padding:8px;vertical-align:top;text-align:left}
-th{background:#f5f5f4;font-size:13px}td.n{width:32px;text-align:center}td.img{width:300px}td.img img{width:100%;display:block;border-radius:4px}td.img img.tall{width:auto;max-width:100%;max-height:380px;margin:0 auto}
-.tc{font:600 14px ui-monospace,Menlo,monospace}.cat{display:inline-block;background:#f1f5f9;border-radius:999px;padding:0 8px;font-size:12px;margin-top:4px}
-.txt{white-space:pre-wrap}.by{color:#78716c;font-size:12px;margin-top:4px}.st{font-size:12px;color:#b45309}.st.ok{color:#15803d}
-ol.g li{margin:6px 0}@media print{body{padding:0}tr{page-break-inside:avoid}}
-</style></head><body>
-<h1>${esc(base())}</h1>
-<div class="meta">影片：${esc(videoName)}　FPS：${esc($('#fps').value)}　${reviewers() ? '審片：' + esc(reviewers()) + '　' : ''}產出：${new Date().toLocaleString('zh-TW')}<br>
-共 ${notes.length} 則（整體 ${general.length}、逐點 ${timed.length}），已修改 ${notes.filter(n => n.done).length}</div>
-${general.length ? `<h2>整體意見</h2><ol class="g">${general.map(n => `<li><span class="cat">${esc(n.cat)}</span> <span class="txt">${esc(n.text)}</span> ${st(n)}${by(n)}</li>`).join('')}</ol>` : ''}
-${timed.length ? `<h2>逐點修改</h2><table><tr><th>#</th><th>畫面</th><th>時間碼 / 類別</th><th>修改內容</th></tr>
-${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">${shots[n.id] ? `<img src="${shots[n.id].url}"${shots[n.id].h > shots[n.id].w ? ' class="tall"' : ''} alt="">` : ''}</td>
-<td><div class="tc">${tcOfFrame(n.frame)}</div><div class="cat">${esc(n.cat)}</div></td>
-<td><div class="txt">${esc(n.text)}</div>${by(n)}<div>${st(n)}</div></td></tr>`).join('')}</table>` : ''}
-</body></html>`;
+<title>${esc(D.title)}｜修改意見表</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{--ink:#1d1b2e;--ink2:#4a4766;--muted:#7a7790;--line:#e6e4f0;--soft:#f5f4fb;--accent:#3b2bff;--ok:#12813a;--warn:#b25e00;--no:#8a8799}
+*{box-sizing:border-box}
+body{margin:0;background:#eceaf4;color:var(--ink);font:14px/1.7 "Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;-webkit-font-smoothing:antialiased}
+.doc{max-width:980px;margin:32px auto;background:#fff;padding:48px 56px 40px;border-radius:6px;box-shadow:0 10px 40px rgba(29,27,46,.10)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:16px;border-bottom:3px solid var(--accent)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}.logo{width:30px;height:30px}
+.kind{font-size:12px;letter-spacing:.2em;color:var(--accent);font-weight:700}
+h1{font-size:30px;line-height:1.3;margin:28px 0 18px;letter-spacing:.02em}
+.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 28px;margin:0 0 24px;padding:16px 20px;background:var(--soft);border-radius:10px}
+.meta dt{font-size:11.5px;color:var(--muted);letter-spacing:.05em}.meta dd{margin:2px 0 0;font-weight:500;word-break:break-all}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:12px 16px}.stat b{display:block;font-size:26px;line-height:1.2;color:var(--accent);font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{display:inline-block;font-size:11.5px;line-height:1.6;padding:1px 9px;border-radius:999px;background:#eceafd;color:#3a2fb8;white-space:nowrap}
+.chip.n{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+h2{display:flex;align-items:baseline;gap:12px;font-size:18px;margin:36px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h2 .no{font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.08em}
+.gen{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.gen li{display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start;padding:12px 16px;border:1px solid var(--line);border-radius:10px}
+.idx{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.txt{white-space:pre-wrap}.sub{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.by{font-size:12px;color:var(--muted)}.dec{font-size:12px;color:var(--ink2);background:#fff7e8;border-radius:6px;padding:0 6px}
+.st{font-size:12.5px;white-space:nowrap;color:var(--warn);font-weight:500}.st.ok{color:var(--ok)}.st.no{color:var(--no)}
+table{width:100%;border-collapse:collapse}
+thead th{font-size:12px;font-weight:700;letter-spacing:.06em;text-align:left;color:#fff;background:var(--accent);padding:9px 12px}
+thead th:first-child{border-radius:8px 0 0 0}thead th:last-child{border-radius:0 8px 0 0}
+tbody td{border-bottom:1px solid var(--line);padding:14px 12px;vertical-align:top}
+tbody tr:nth-child(even) td{background:#fcfbff}
+td.n{width:40px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+td.img{width:300px}.shot{position:relative;border-radius:8px;overflow:hidden;background:#0f0c2e;line-height:0}
+.shot img{width:100%;display:block}.shot.tall{width:170px}
+.shot .tc{position:absolute;left:8px;top:8px;line-height:1.5;font:600 12px ui-monospace,Menlo,Consolas,monospace;color:#fff;background:rgba(15,12,46,.82);padding:2px 7px;border-radius:5px}
+.tcx{font:700 14px ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;margin-bottom:6px}
+td.s{width:92px}
+.foot{display:flex;justify-content:space-between;gap:16px;margin-top:36px;padding-top:12px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+@page{size:A4;margin:12mm}
+@media print{body{background:#fff}.doc{margin:0;max-width:none;box-shadow:none;padding:0}tr,.gen li,.stat{break-inside:avoid}thead{display:table-header-group}
+  thead th{-webkit-print-color-adjust:exact;print-color-adjust:exact}.meta,.chip,.shot .tc,.dec,tbody tr:nth-child(even) td{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media (max-width:700px){.doc{margin:0;padding:24px 16px;border-radius:0}.meta{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}td.img{width:44%}}
+</style></head><body><main class="doc">
+<header class="top"><div class="brand">${logo}片語 Clipnote</div><div class="kind">修改意見表 · REVISION NOTES</div></header>
+<h1>${esc(D.title)}</h1>
+<dl class="meta">${D.meta.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+<div class="stats">${D.stats.map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('')}</div>
+${D.cats.length ? `<div class="cats">${D.cats.map(([k, v]) => chip(`${k}　${v}`, 'n')).join('')}</div>` : ''}
+${D.general.length ? `${head('整體意見')}<ol class="gen">${D.general.map(n => `<li><span class="idx">#${notes.indexOf(n) + 1}</span>
+  <div><div class="txt">${esc(n.text)}</div><div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></div>${status(n)}</li>`).join('')}</ol>` : ''}
+${D.timed.length ? `${head('逐點修改')}<table><thead><tr><th>#</th><th>畫面</th><th>修改內容</th><th>狀態</th></tr></thead><tbody>
+${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
+  return `<tr><td class="n">${notes.indexOf(n) + 1}</td>
+  <td class="img">${sh ? `<div class="shot${tall ? ' tall' : ''}"><img src="${sh.url}" alt=""><span class="tc">${tcOfFrame(n.frame)}</span></div>` : `<div class="tcx">${tcOfFrame(n.frame)}</div>`}</td>
+  <td><div class="tcx">${tcOfFrame(n.frame)}</div><div class="txt">${esc(n.text)}</div><div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></td>
+  <td class="s">${status(n)}</td></tr>`; }).join('')}
+</tbody></table>` : ''}
+<footer class="foot"><span>片語 Clipnote · ${esc(D.title)}</span><span>產出 ${esc(D.meta[4][1])}</span></footer>
+</main></body></html>`;
   }
   async function withBusy(btn, fn) {
     if (!need() || btn.disabled) return;
@@ -1392,10 +1519,10 @@ ${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">
     try { await fn(); } catch (err) { alert('匯出失敗：' + err.message); } finally { btn.disabled = false; }
   }
   $('#btnReport').onclick = e => withBusy(e.currentTarget, async () => {
-    download(base() + '.html', reportHtml(await captureFrames(e.currentTarget)), 'text/html;charset=utf-8');
+    download(base() + '.html', await reportHtml(await captureFrames(e.currentTarget)), 'text/html;charset=utf-8');
   });
   $('#btnPrint').onclick = e => withBusy(e.currentTarget, async () => {
-    const html = reportHtml(await captureFrames(e.currentTarget));
+    const html = await reportHtml(await captureFrames(e.currentTarget));
     $('#printView').innerHTML = html.slice(html.indexOf('<style>'), html.indexOf('</style>') + 8) + html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'));
     await Promise.all([...$('#printView').querySelectorAll('img')].map(i => i.decode?.().catch(() => {})));
     window.print();
@@ -1407,43 +1534,81 @@ ${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">
     btn.textContent = '載入中…';
     await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js').finally(() => { btn.innerHTML = label0; });
     const shots = await captureFrames(btn);
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, ShadingType } = window.docx;
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ImageRun, ShadingType, BorderStyle,
+      AlignmentType, VerticalAlign, Header, Footer, PageNumber, TabStopType } = window.docx;
+    const D = docData(), logo = await iconPng(96);
+    const INK = '1D1B2E', INK2 = '4A4766', MUTED = '7A7790', LINE = 'E6E4F0', SOFT = 'F5F4FB', ACCENT = '3B2BFF';
     const font = { ascii: 'Calibri', hAnsi: 'Calibri', eastAsia: 'Microsoft JhengHei' };
-    const lines = (text, opts = {}) => String(text).split('\n').map((t, i) => new TextRun({ text: t, break: i ? 1 : 0, ...opts }));
-    const P = (text, opts = {}) => new Paragraph({ children: lines(text, opts) });
-    const bytes = url => Uint8Array.from(atob(url.split(',')[1]), c => c.charCodeAt(0));
-    const cell = (children, pct, head) => new TableCell({ children, width: { size: pct, type: WidthType.PERCENTAGE },
-      ...(head ? { shading: { type: ShadingType.CLEAR, fill: 'F5F5F4', color: 'auto' } } : {}) });
-    const status = n => P(n.done ? '已修改' : '待修改', { color: n.done ? '15803D' : 'B45309', size: 18 });
-    const general = notes.filter(n => n.general), timed = timedNotes();
+    const mono = { ascii: 'Consolas', hAnsi: 'Consolas', eastAsia: 'Microsoft JhengHei' };
+    const R = (text, o = {}) => new TextRun({ text: String(text), ...o });
+    const lines = (text, o = {}) => String(text).split('\n').map((t, i) => new TextRun({ text: t, break: i ? 1 : 0, ...o }));
+    const P = (children, o = {}) => new Paragraph({ children: Array.isArray(children) ? children : lines(children), ...o });
+    const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, thin = { style: BorderStyle.SINGLE, size: 4, color: LINE };
+    const noBorders = { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none };
+    const gridBorders = { top: thin, bottom: thin, left: none, right: none, insideHorizontal: thin, insideVertical: none };
+    const PAGE_W = 9906; // A4 width minus 1000-twip margins
+    const cols = pcts => pcts.map(x => Math.round(PAGE_W * x / 100));
+    const table = (pcts, rows, borders) => new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: cols(pcts), borders, rows });
+    const cell = (children, pct, o = {}) => new TableCell({ children, width: { size: Math.round(PAGE_W * pct / 100), type: WidthType.DXA },
+      margins: { top: 110, bottom: 110, left: 140, right: 140 }, verticalAlign: VerticalAlign.TOP, ...o });
+    const shade = fill => ({ shading: { type: ShadingType.CLEAR, fill, color: 'auto' } });
+    const bytes = url => Uint8Array.from(atob(url.split(',')[1]), ch => ch.charCodeAt(0));
+    const statusRun = n => { const [box, t] = D.statusOf(n); return R(`${box} ${t}`, { color: n.done ? '12813A' : n.decision === 'reject' ? '8A8799' : 'B25E00', bold: true, size: 19 }); };
+    const subLine = n => P([...(n.cat ? [R(n.cat, { color: ACCENT, size: 17 })] : []), ...(n.by ? [R(`　${n.by}`, { color: MUTED, size: 17 })] : []),
+      ...(D.decisionOf(n) ? [R(`　處理：${D.decisionOf(n)}`, { color: INK2, size: 17, highlight: 'yellow' })] : [])], { spacing: { before: 60 } });
+    let sec = 0;
+    const heading = t => P([R(pad2(++sec) + '　', { color: ACCENT, bold: true, size: 22 }), R(t, { bold: true, size: 28, color: INK })],
+      { spacing: { before: 420, after: 160 }, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: LINE, space: 4 } } });
+
     const children = [
-      new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(base())] }),
-      P(`影片：${videoName}　FPS：${$('#fps').value}${reviewers() ? '　審片：' + reviewers() : ''}`, { color: '57534E', size: 20 }),
-      P(`產出：${new Date().toLocaleString('zh-TW')}　共 ${notes.length} 則（整體 ${general.length}、逐點 ${timed.length}），已修改 ${notes.filter(n => n.done).length}`, { color: '57534E', size: 20 }),
+      // title block
+      P([...(logo ? [new ImageRun({ data: logo, transformation: { width: 26, height: 26 } }), R('  ')] : []),
+        R('片語 Clipnote', { bold: true, size: 22, color: INK }), R('\t修改意見表 · REVISION NOTES', { bold: true, size: 17, color: ACCENT })],
+        { tabStops: [{ type: TabStopType.RIGHT, position: 9600 }], border: { bottom: { style: BorderStyle.SINGLE, size: 18, color: ACCENT, space: 8 } }, spacing: { after: 360 } }),
+      P([R(D.title, { bold: true, size: 44, color: INK })], { spacing: { after: 240 } }),
+      table([33.4, 33.3, 33.3], [0, 3].map(r => new TableRow({
+        children: D.meta.slice(r, r + 3).map(([k, v]) => cell([P([R(k, { color: MUTED, size: 16 })]), P([R(v, { size: 20, bold: true, color: INK })])], 33.3, shade(SOFT))) })), noBorders),
+      P('', { spacing: { after: 120 } }),
+      table([25, 25, 25, 25], [new TableRow({ children: D.stats.map(([k, v]) => cell([P([R(v, { bold: true, size: 40, color: ACCENT })]), P([R(k, { color: MUTED, size: 16 })])], 25)) })],
+        { top: thin, bottom: thin, left: thin, right: thin, insideHorizontal: thin, insideVertical: thin }),
+      ...(D.cats.length ? [P([R('類別　', { color: MUTED, size: 17 }), ...D.cats.flatMap(([k, v], i) => [R(`${i ? '　·　' : ''}${k} ${v}`, { size: 17, color: INK2 })])], { spacing: { before: 140 } })] : []),
     ];
-    if (general.length) {
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('整體意見')] }));
-      general.forEach((n, i) => children.push(new Paragraph({ children: [
-        new TextRun({ text: `${i + 1}. `, bold: true }), new TextRun({ text: `[${n.cat}] `, color: '2563EB' }),
-        ...lines(n.text), new TextRun({ text: `　${n.done ? '已修改' : '待修改'}${n.by ? '　— ' + n.by : ''}`, color: '78716C', size: 18 })] })));
+    if (D.general.length) {
+      children.push(heading('整體意見'));
+      children.push(table([8, 76, 16], D.general.map(n => new TableRow({ cantSplit: true, children: [
+        cell([P([R('#' + (notes.indexOf(n) + 1), { bold: true, color: MUTED })])], 8),
+        cell([P(lines(n.text, { size: 21, color: INK })), subLine(n)], 76),
+        cell([P([statusRun(n)], { alignment: AlignmentType.RIGHT })], 16),
+      ] })), gridBorders));
     }
-    if (timed.length) {
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('逐點修改')] }));
-      const head = new TableRow({ tableHeader: true, children: ['#', '畫面', '時間碼 / 類別', '修改內容'].map((h, i) =>
-        cell([P(h, { bold: true })], [6, 40, 18, 36][i], true)) });
-      const body = timed.map(n => {
-        const s = shots[n.id], w = s && s.h > s.w ? 140 : 230;
-        return new TableRow({ cantSplit: true, children: [
-          cell([P(String(notes.indexOf(n) + 1))], 6),
-          cell([new Paragraph({ children: s ? [new ImageRun({ data: bytes(s.url), transformation: { width: w, height: Math.round(w * s.h / s.w) } })] : [] })], 40),
-          cell([P(tcOfFrame(n.frame), { bold: true, font: 'Consolas' }), P(n.cat, { color: '2563EB', size: 18 })], 18),
-          cell([P(n.text), ...(n.by ? [P('— ' + n.by, { color: '78716C', size: 18 })] : []), status(n)], 36),
-        ] });
+    if (D.timed.length) {
+      children.push(heading('逐點修改'));
+      const th = (t, pct) => cell([P([R(t, { bold: true, color: 'FFFFFF', size: 17 })])], pct, shade(ACCENT));
+      const rows = [new TableRow({ tableHeader: true, children: [th('#', 6), th('畫面', 38), th('修改內容', 40), th('狀態', 16)] })];
+      D.timed.forEach((n, i) => {
+        const sh = shots[n.id], w = sh && sh.h > sh.w ? 120 : 220;
+        rows.push(new TableRow({ cantSplit: true, children: [
+          cell([P([R(String(notes.indexOf(n) + 1), { bold: true, color: MUTED })])], 6, i % 2 ? shade('FCFBFF') : {}),
+          cell([P(sh ? [new ImageRun({ data: bytes(sh.url), transformation: { width: w, height: Math.round(w * sh.h / sh.w) } })] : [R('（無截圖）', { color: MUTED, size: 17 })])], 38, i % 2 ? shade('FCFBFF') : {}),
+          cell([P([R(tcOfFrame(n.frame), { bold: true, font: mono, size: 21, color: INK })], { spacing: { after: 80 } }),
+            P(lines(n.text, { size: 21, color: INK })), subLine(n)], 40, i % 2 ? shade('FCFBFF') : {}),
+          cell([P([statusRun(n)])], 16, i % 2 ? shade('FCFBFF') : {}),
+        ] }));
       });
-      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [head, ...body] }));
+      children.push(table([6, 38, 40, 16], rows, gridBorders));
     }
-    const doc = new Document({ styles: { default: { document: { run: { font, size: 21 } } } },
-      sections: [{ properties: { page: { margin: { top: 1000, bottom: 1000, left: 900, right: 900 } } }, children }] });
+    const doc = new Document({
+      creator: '片語 Clipnote', title: `${D.title}｜修改意見表`,
+      styles: { default: { document: { run: { font, size: 21, color: INK } } } },
+      sections: [{
+        properties: { page: { margin: { top: 1000, bottom: 1000, left: 1000, right: 1000 } } },
+        headers: { default: new Header({ children: [P([R(`${D.title}｜修改意見表`, { size: 15, color: MUTED })], { alignment: AlignmentType.RIGHT })] }) },
+        footers: { default: new Footer({ children: [P([R('片語 Clipnote', { size: 15, color: MUTED }),
+          new TextRun({ children: ['\t第 ', PageNumber.CURRENT, ' / ', PageNumber.TOTAL_PAGES, ' 頁'], size: 15, color: MUTED })],
+          { tabStops: [{ type: TabStopType.RIGHT, position: 9900 }] })] }) },
+        children,
+      }],
+    });
     download(base() + '.docx', await Packer.toBlob(doc), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
   });
 
@@ -1476,7 +1641,8 @@ ${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">
     if (bar.hidden) return;
     const info = project.info || {}, st = info.status || 'review';
     $('#statusText').innerHTML = statusChip(st) + (info.statusBy ? ` <span class="small muted">${esc(info.statusBy)}・${new Date(info.statusAt).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>` : '');
-    bar.querySelectorAll('[data-status]').forEach(b => b.classList.toggle('on', b.dataset.status === st));
+    // highlight a decision only; "back to review" is an action, never a current state to show off
+    bar.querySelectorAll('[data-status]').forEach(b => b.classList.toggle('on', st !== 'review' && b.dataset.status === st));
   }
   $('#statusBar').addEventListener('click', async e => {
     const st = e.target.closest('[data-status]')?.dataset.status;

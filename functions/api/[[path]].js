@@ -66,9 +66,43 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   }
 
   if ((m = path.match(/^\/videos\/([\w-]+)\/notes$/)) && method === 'GET') return json({ notes: await listNotes(d, m[1]) });
+
+  // Every open (not done) note across the folder's videos, flagged new when changed after `since`.
+  // Screenshots are left out unless thumbs=1, so the local Claude helper gets a small, readable payload.
+  if (path === '/inbox' && method === 'GET') {
+    const since = +url.searchParams.get('since') || 0, thumbs = url.searchParams.get('thumbs') === '1';
+    const files = await listVideos(env);
+    const { results: infos } = await d.prepare("SELECT k, v FROM kv WHERE k LIKE 'video:%'").all();
+    const info = Object.fromEntries(infos.map(r => [r.k.slice(6), JSON.parse(r.v)]));
+    const videos = [];
+    for (const f of files) {
+      const open = (await listNotes(d, f.id)).filter(n => !n.done && n.decision !== 'reject')
+        .sort((a, b) => (a.general ? -1 : a.t) - (b.general ? -1 : b.t))
+        .map(({ thumb, ...n }) => ({ ...n, new: n.updated > since, ...(thumbs ? { thumb } : {}) }));
+      const i = info[f.id] || {};
+      if (open.length || (i.statusAt || 0) > since)
+        videos.push({ id: f.id, name: f.name, status: i.status || 'review', statusBy: i.statusBy || null, statusAt: i.statusAt || null,
+          fps: i.fps || '29.97', startTc: i.startTc || '00:00:00:00', open: open.length, new: open.filter(n => n.new).length, notes: open });
+    }
+    return json({ now: Date.now(), since, videos });
+  }
   if ((m = path.match(/^\/videos\/([\w-]+)\/notes\/([\w-]+)$/))) {
     if (method === 'PUT') { await putNote(d, m[1], m[2], await body(request), OWNER); return json({ ok: true }); }
     if (method === 'DELETE') { await deleteNote(d, m[1], m[2], OWNER); return json({ ok: true }); }
+    if (method === 'PATCH') {
+      const note = (await listNotes(d, m[1])).find(n => n.id === m[2]);
+      if (!note) throw new HttpError(404, '找不到這則意見');
+      const input = await body(request);
+      if ('done' in input) note.done = !!input.done;
+      // the owner's call on a client's note: accept (as written), adjust (do it differently), reject (won't change)
+      if ('decision' in input) {
+        if (input.decision && !['accept', 'adjust', 'reject'].includes(input.decision)) throw new HttpError(400, '決定只能是 accept、adjust 或 reject');
+        note.decision = input.decision || null;
+        note.decisionNote = String(input.decisionNote || '').slice(0, 2000) || null;
+      }
+      await putNote(d, m[1], m[2], note, OWNER);
+      return json({ ok: true, done: note.done, decision: note.decision || null });
+    }
   }
 
   // ---------- share links ----------

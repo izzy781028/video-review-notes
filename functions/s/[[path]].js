@@ -7,6 +7,8 @@ import { transcribe, polish } from '../../lib/ai.js';
 import { resolveShare, who } from '../../lib/share.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday } from '../../lib/core.js';
 
+const forGuest = notes => notes.map(({ decision, decisionNote, ...n }) => n);
+
 const api = handle(async ({ request, env, params, waitUntil }) => {
   const url = new URL(request.url);
   const path = '/' + [].concat(params.path || []).slice(1).join('/');
@@ -28,12 +30,12 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
       video: { id: share.video, name: meta.name }, info: await getVideo(d, share.video),
       config: { cats: config.cats, autoPolish: config.autoPolish, polishImage: config.polishImage },
       limit: dailyLimit(env), used: await usedToday(d, share.id),
-      notes: await listNotes(d, share.video, me.author),
+      notes: forGuest(await listNotes(d, share.video, me.author)),
     }));
   }
   if (path === '/media') return withCookies(await streamVideo(env, share.video, request));
 
-  if (path === '/notes' && method === 'GET') return json({ notes: await listNotes(d, share.video, me.author) });
+  if (path === '/notes' && method === 'GET') return json({ notes: forGuest(await listNotes(d, share.video, me.author)) });
   if ((m = path.match(/^\/notes\/([\w-]+)$/))) {
     if (method === 'PUT') { await putNote(d, share.video, m[1], await body(request), me); return json({ ok: true }); }
     if (method === 'DELETE') { await deleteNote(d, share.video, m[1], me); return json({ ok: true }); }
