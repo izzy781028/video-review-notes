@@ -118,6 +118,21 @@
   #drop { border: 2px dashed var(--line); border-radius: 18px; padding: 40px 16px; text-align: center; color: var(--muted); cursor: pointer; background: var(--glass-flat); }
   #drop.over { border-color: var(--accent); color: var(--accent); }
   video { width: 100%; max-height: 62vh; background: #000; border-radius: 18px; display: block; }
+  /* vertical (9:16) video: size by height, centered, and give the notes column more room */
+  body.portrait video { width: auto; max-width: 100%; height: min(76vh, 960px); max-height: none; margin: 0 auto; }
+  /* desktop: vertical video on the left, controls and the note editor beside it, so nothing needs scrolling */
+  @media (min-width: 901px) {
+    body.portrait main { grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr); }
+    body.portrait #playerWrap { display: grid; grid-template-columns: auto minmax(280px, 1fr); column-gap: 20px; align-items: start; }
+    body.portrait #playerWrap > #stage { grid-column: 1; grid-row: 1 / span 20; }
+    body.portrait #playerWrap > :not(#stage) { grid-column: 2; }
+    body.portrait #playerWrap > #timeline { margin-top: 0; }
+    body.portrait .transport { flex-wrap: wrap; width: 100%; }
+  }
+  #stage { scroll-margin-top: 84px; }
+  body.portrait .note { grid-template-columns: 64px 1fr; }
+  body.portrait .note img { width: 64px; }
+  body.portrait #editor img { width: 96px; }
   .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
   #tc { font: 700 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
   .muted { color: var(--muted); }
@@ -226,6 +241,12 @@
     .panel { padding: 12px; border-radius: 22px; }
     #drop { padding: 32px 12px; }
     video { max-height: 45vh; }
+    body.portrait video { height: 62vh; }
+    body.portrait #editor img { width: 30%; }
+    /* while writing a note: smaller vertical video, no transport, so the frame and the editor fit on one screen */
+    body.portrait.editing video { height: 36vh; }
+    body.editing .transport, body.editing .kbdhint, body.editing #btnChange, body.editing #btnShare, body.editing #srcName { display: none !important; }
+    #editor img { display: none; } /* the frame is right above; keep the text box and Save on screen */
     #list { max-height: none; overflow: visible; }
     #editor .row { flex-direction: column; }
     #editor img { width: 50%; }
@@ -807,7 +828,10 @@
   }
   video.addEventListener('timeupdate', updateTc);
   video.addEventListener('seeked', updateTc);
-  video.addEventListener('loadedmetadata', () => { render(); updateTc(); });
+  video.addEventListener('loadedmetadata', () => {
+    document.body.classList.toggle('portrait', video.videoHeight > video.videoWidth);
+    render(); updateTc(); refreshPt();
+  });
   (function tick() { if (!video.paused) updateTc(); requestAnimationFrame(tick); })();
   $('#timeline').onclick = e => {
     if (!video.duration || e.target.classList.contains('pin')) return;
@@ -854,8 +878,8 @@
 
   function grabThumb(pt) {
     if (!video.videoWidth) return '';
-    const c = document.createElement('canvas'), w = 320;
-    c.width = w; c.height = Math.round(w * video.videoHeight / video.videoWidth);
+    const c = document.createElement('canvas'), k = 320 / Math.max(video.videoWidth, video.videoHeight);
+    c.width = Math.round(video.videoWidth * k); c.height = Math.round(video.videoHeight * k);
     c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
     drawPt(c.getContext('2d'), c.width, c.height, pt);
     try { return c.toDataURL('image/jpeg', 0.7); } catch { return ''; }
@@ -878,7 +902,8 @@
     $('#btnRaw').hidden = !editing.raw;
     $('#editor').classList.add('open');
     document.body.classList.add('editing');
-    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => $('#editor').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => { $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' }); refreshPt(); }, 50);
+    else setTimeout(() => { $('#editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); refreshPt(); }, 50);
   }
   function syncGeneral() {
     const g = $('#edGeneral').checked;
@@ -1290,19 +1315,20 @@
   }
   // re-grab each timed note at full resolution (the stored thumbnails are small to keep storage light)
   async function captureFrames(btn) {
-    const label0 = btn.textContent, back = video.currentTime, out = {};
+    const label0 = btn.innerHTML, back = video.currentTime, out = {};
     video.pause();
     const timed = timedNotes();
     for (let i = 0; i < timed.length; i++) {
       btn.textContent = `擷取畫面 ${i + 1}/${timed.length}…`;
       await waitSeek(timed[i].frame);
-      const c = document.createElement('canvas'), w = Math.min(1280, video.videoWidth || 1280);
-      c.width = w; c.height = Math.round(w * (video.videoHeight || 720) / (video.videoWidth || 1280));
+      const vw = video.videoWidth || 1280, vh = video.videoHeight || 720, k = Math.min(1, 1280 / Math.max(vw, vh));
+      const c = document.createElement('canvas');
+      c.width = Math.round(vw * k); c.height = Math.round(vh * k);
       c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
       drawPt(c.getContext('2d'), c.width, c.height, timed[i].pt);
       try { out[timed[i].id] = { url: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height }; } catch { break; } // cross-origin video: no screenshots
     }
-    video.currentTime = back; btn.textContent = label0;
+    video.currentTime = back; btn.innerHTML = label0;
     return out;
   }
   const reviewers = () => [...new Set(notes.map(n => n.by).filter(Boolean))].join('、');
@@ -1315,7 +1341,7 @@
 body{font:14px/1.6 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1c1917;background:#fff;max-width:1000px;margin:0 auto;padding:24px 16px}
 h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 10px;border-bottom:2px solid #1c1917;padding-bottom:4px}
 .meta{color:#57534e;font-size:13px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d6d3d1;padding:8px;vertical-align:top;text-align:left}
-th{background:#f5f5f4;font-size:13px}td.n{width:32px;text-align:center}td.img{width:300px}td.img img{width:100%;display:block;border-radius:4px}
+th{background:#f5f5f4;font-size:13px}td.n{width:32px;text-align:center}td.img{width:300px}td.img img{width:100%;display:block;border-radius:4px}td.img img.tall{width:auto;max-width:100%;max-height:380px;margin:0 auto}
 .tc{font:600 14px ui-monospace,Menlo,monospace}.cat{display:inline-block;background:#f1f5f9;border-radius:999px;padding:0 8px;font-size:12px;margin-top:4px}
 .txt{white-space:pre-wrap}.by{color:#78716c;font-size:12px;margin-top:4px}.st{font-size:12px;color:#b45309}.st.ok{color:#15803d}
 ol.g li{margin:6px 0}@media print{body{padding:0}tr{page-break-inside:avoid}}
@@ -1325,7 +1351,7 @@ ol.g li{margin:6px 0}@media print{body{padding:0}tr{page-break-inside:avoid}}
 共 ${notes.length} 則（整體 ${general.length}、逐點 ${timed.length}），已修改 ${notes.filter(n => n.done).length}</div>
 ${general.length ? `<h2>整體意見</h2><ol class="g">${general.map(n => `<li><span class="cat">${esc(n.cat)}</span> <span class="txt">${esc(n.text)}</span> ${st(n)}${by(n)}</li>`).join('')}</ol>` : ''}
 ${timed.length ? `<h2>逐點修改</h2><table><tr><th>#</th><th>畫面</th><th>時間碼 / 類別</th><th>修改內容</th></tr>
-${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">${shots[n.id] ? `<img src="${shots[n.id].url}" alt="">` : ''}</td>
+${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">${shots[n.id] ? `<img src="${shots[n.id].url}"${shots[n.id].h > shots[n.id].w ? ' class="tall"' : ''} alt="">` : ''}</td>
 <td><div class="tc">${tcOfFrame(n.frame)}</div><div class="cat">${esc(n.cat)}</div></td>
 <td><div class="txt">${esc(n.text)}</div>${by(n)}<div>${st(n)}</div></td></tr>`).join('')}</table>` : ''}
 </body></html>`;
@@ -1347,10 +1373,9 @@ ${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">
   // the report's <style> is injected for printing only; drop it so it can't restyle the app
   window.addEventListener('afterprint', () => { $('#printView').innerHTML = ''; });
   $('#btnDocx').onclick = e => withBusy(e.currentTarget, async () => {
-    const btn = e.currentTarget;
+    const btn = e.currentTarget, label0 = btn.innerHTML;
     btn.textContent = '載入中…';
-    await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js');
-    btn.textContent = '文件 (Word)';
+    await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js').finally(() => { btn.innerHTML = label0; });
     const shots = await captureFrames(btn);
     const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, ShadingType } = window.docx;
     const font = { ascii: 'Calibri', hAnsi: 'Calibri', eastAsia: 'Microsoft JhengHei' };
@@ -1377,7 +1402,7 @@ ${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">
       const head = new TableRow({ tableHeader: true, children: ['#', '畫面', '時間碼 / 類別', '修改內容'].map((h, i) =>
         cell([P(h, { bold: true })], [6, 40, 18, 36][i], true)) });
       const body = timed.map(n => {
-        const s = shots[n.id], w = 230;
+        const s = shots[n.id], w = s && s.h > s.w ? 140 : 230;
         return new TableRow({ cantSplit: true, children: [
           cell([P(String(notes.indexOf(n) + 1))], 6),
           cell([new Paragraph({ children: s ? [new ImageRun({ data: bytes(s.url), transformation: { width: w, height: Math.round(w * s.h / s.w) } })] : [] })], 40),
