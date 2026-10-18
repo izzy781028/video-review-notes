@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="影片修改">
+<title>影片修改對齊</title>
+<style>
+  :root {
+    --bg: #f5f5f4; --panel: #ffffff; --ink: #1c1917; --muted: #78716c; --line: #e7e5e4;
+    --accent: #2563eb; --accent-ink: #ffffff; --rec: #dc2626; --done: #16a34a; --chip: #f1f5f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0c0a09; --panel: #1c1917; --ink: #f5f5f4; --muted: #a8a29e; --line: #292524;
+      --accent: #3b82f6; --accent-ink: #ffffff; --rec: #ef4444; --done: #22c55e; --chip: #292524;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c0a09; --panel: #1c1917; --ink: #f5f5f4; --muted: #a8a29e; --line: #292524;
+    --accent: #3b82f6; --accent-ink: #ffffff; --rec: #ef4444; --done: #22c55e; --chip: #292524;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px;
+    border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  header .spacer { flex: 1; }
+  button, select, input[type=text], input[type=password], textarea {
+    font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  button { padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.rec { background: var(--rec); color: #fff; border-color: var(--rec); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .65; } }
+  select, input[type=text], input[type=password] { padding: 5px 8px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 16px; padding: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  #drop { border: 2px dashed var(--line); border-radius: 10px; padding: 48px 16px; text-align: center; color: var(--muted); cursor: pointer; }
+  #drop.over { border-color: var(--accent); color: var(--accent); }
+  video { width: 100%; max-height: 62vh; background: #000; border-radius: 8px; display: block; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  #tc { font: 600 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  #timeline { position: relative; height: 18px; margin-top: 8px; background: var(--chip); border-radius: 4px; cursor: pointer; }
+  #timeline .pin { position: absolute; top: 2px; width: 3px; height: 14px; background: var(--accent); border-radius: 2px; transform: translateX(-1px); }
+  #timeline .pin.done { background: var(--done); }
+  #timeline .head { position: absolute; top: 0; width: 2px; height: 18px; background: var(--rec); }
+  #editor { margin-top: 12px; display: none; }
+  #editor.open { display: block; }
+  #editor .row { display: flex; gap: 10px; align-items: flex-start; }
+  #editor img { width: 160px; border-radius: 6px; flex: none; background: #000; }
+  #editor img[src=""], .note img[src=""] { visibility: hidden; }
+  .note.general { border-style: dashed; }
+  #editor textarea { width: 100%; min-height: 96px; padding: 8px; resize: vertical; }
+  #recStatus { min-height: 1.5em; }
+  #list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 140px); overflow: auto; }
+  .note { display: grid; grid-template-columns: 96px 1fr; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .note.active { border-color: var(--accent); }
+  .note.done .text { text-decoration: line-through; color: var(--muted); }
+  .note img { width: 96px; border-radius: 4px; cursor: pointer; background: #000; }
+  .note .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .note .tcbtn { font-family: ui-monospace, Menlo, monospace; font-weight: 600; padding: 2px 6px; }
+  .note .chip { background: var(--chip); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+  .note .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; outline: none; border-radius: 4px; }
+  .note .text:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .note .actions { display: flex; gap: 6px; margin-top: 4px; }
+  .note .actions button { padding: 2px 8px; font-size: 12px; }
+  dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); width: min(560px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  dialog label { display: block; margin: 10px 0 4px; font-weight: 600; }
+  dialog input, dialog select, dialog textarea { width: 100%; }
+  dialog textarea { min-height: 90px; padding: 6px 8px; }
+  kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+  .menu { position: relative; }
+  .menu summary { list-style: none; }
+  .menu summary::-webkit-details-marker { display: none; }
+  .btn { display: inline-flex; align-items: center; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; user-select: none; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; display: flex; flex-direction: column; gap: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; min-width: 260px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .menu-list button { text-align: left; border-color: transparent; }
+  .transport button { min-width: 52px; }
+  #loader .bar input { padding: 8px; }
+  #printView { display: none; }
+  /* ---------- phone ---------- */
+  @media (max-width: 700px) {
+    header { padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); }
+    main { padding: 8px; gap: 8px; }
+    .panel { padding: 8px; }
+    #drop { padding: 32px 12px; }
+    video { max-height: 45vh; }
+    #list { max-height: none; overflow: visible; }
+    #editor .row { flex-direction: column; }
+    #editor img { width: 50%; }
+    #addBar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; margin: 0; padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      background: var(--panel); border-top: 1px solid var(--line); display: grid; grid-template-columns: 1.4fr 1fr 1fr; }
+    body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+    body.editing #addBar { display: none; }
+    .transport { display: grid; grid-template-columns: repeat(5, 1fr) ; }
+    .transport [data-step=prev], .transport [data-step=next] { grid-column: span 2; }
+    .transport [data-step=next] { grid-column: 4 / span 2; }
+    .menu-list { position: fixed; left: 12px; right: 12px; top: auto; }
+  }
+  @media (pointer: coarse) {
+    button, .btn, select { min-height: 44px; }
+    .note .actions button, .note .tcbtn { min-height: 36px; }
+    textarea, input, select { font-size: 16px !important; } /* stops iOS zooming on focus */
+    kbd, .kbdhint { display: none; }
+    #timeline { height: 28px; }
+    #timeline .pin { height: 24px; width: 5px; }
+    #timeline .head { height: 28px; }
+  }
+  @media print {
+    body > *:not(#printView) { display: none !important; }
+    #printView { display: block; color: #000; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>影片修改對齊</h1>
+  <span class="spacer"></span>
+  <details class="menu" id="exportMenu">
+    <summary class="btn primary">匯出 ▾</summary>
+    <div class="menu-list">
+      <button id="btnDocx" title="含時間碼截圖與文字的 Word 文件">📄 文件（Word，含截圖）</button>
+      <button id="btnReport" title="含截圖的網頁報告，可直接另存 PDF">🖼 文件（HTML，含截圖）</button>
+      <button id="btnPrint">🖨 列印 / 存成 PDF</button>
+      <button id="btnCopy" title="Tab 分隔，可直接貼到 Excel / Google 試算表">📋 複製表格（貼到 Excel）</button>
+      <button id="btnCsv">CSV 表格</button>
+      <button id="btnXml" title="Premiere / FCP7 XML，時間碼變成序列標記">Premiere 標記（XML）</button>
+      <button id="btnSrt">SRT 字幕（疊在影片上看）</button>
+      <button id="btnJson">JSON（給別人合併 / 換電腦）</button>
+      <button id="btnImport" title="載入其他人的 JSON 意見合併">⤵ 匯入別人的意見（JSON）</button>
+    </div>
+  </details>
+  <button id="btnSettings">⚙ 設定</button>
+  <input id="importFile" type="file" accept=".json,application/json" hidden>
+</header>
+
+<main>
+  <section class="panel">
+    <div id="loader">
+      <div id="drop"><strong>點這裡選影片</strong>，或把影片拖進來<br>
+        <span class="small">手機可以從相簿、檔案 App 選，或直接拍攝。影片只在你的裝置上播放，不會上傳。</span></div>
+      <form id="urlForm" class="bar">
+        <input id="videoUrl" type="url" placeholder="或貼上影片連結（Dropbox、NAS、直連 mp4…）" style="flex:1; min-width:0">
+        <button class="primary">載入</button>
+      </form>
+      <div id="urlHint" class="small muted"></div>
+    </div>
+    <input id="videoFile" type="file" accept="video/*" hidden>
+    <div id="playerWrap" hidden>
+      <video id="video" controls playsinline></video>
+      <div id="timeline" title="點擊跳轉"><div class="head" id="head"></div></div>
+      <div class="bar">
+        <span id="tc">00:00:00:00</span>
+        <button id="fpsBadge" class="small muted" title="更改 FPS / 起始時間碼" style="border:0;background:none;padding:0"></button>
+        <span class="spacer" style="flex:1"></span>
+        <span id="srcName" class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%"></span>
+        <button id="btnChange" class="small">換影片</button>
+      </div>
+      <div id="srcHint" class="small" style="color:var(--rec)"></div>
+      <div class="bar transport">
+        <button data-step="-1s">−1秒</button>
+        <button data-step="-1f">−1格</button>
+        <button data-step="play" id="btnPlay">▶</button>
+        <button data-step="+1f">+1格</button>
+        <button data-step="+1s">+1秒</button>
+        <button data-step="prev" title="上一則意見">⏮ 意見</button>
+        <button data-step="next" title="下一則意見">意見 ⏭</button>
+      </div>
+      <div class="bar" id="addBar">
+        <button id="btnAddVoice" class="primary">🎙 語音意見 <kbd>V</kbd></button>
+        <button id="btnAddText">✏️ 文字意見 <kbd>Enter</kbd></button>
+        <button id="btnAddGeneral" title="不針對特定時間碼，針對整支影片的意見">📋 整體意見 <kbd>G</kbd></button>
+      </div>
+      <div class="small muted kbdhint" style="margin-top:6px">
+        <kbd>Space</kbd> 播放/暫停　<kbd>←</kbd><kbd>→</kbd> 前後一格　<kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 前後一秒　<kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> 倒退/停/快轉　<kbd>[</kbd><kbd>]</kbd> 上/下一則意見
+      </div>
+
+      <div id="editor" class="panel">
+        <div class="row">
+          <img id="edThumb" alt="">
+          <div style="flex:1; min-width:0">
+            <div class="bar" style="margin-top:0">
+              <strong id="edTc"></strong>
+              <select id="edCat"></select>
+              <label class="small"><input type="checkbox" id="edGeneral"> 整體意見（不指定時間碼）</label>
+              <span class="spacer" style="flex:1"></span>
+              <button id="btnRec">🎙 錄音</button>
+              <button id="btnPolish" title="用 Claude 把口語整理成具體的修改指示">✨ AI 潤飾</button>
+              <button id="btnRaw" hidden title="換回潤飾前的原始口述">↶ 原始口述</button>
+            </div>
+            <div id="recStatus" class="small muted"></div>
+            <textarea id="edText" placeholder="輸入修改內容… (Ctrl/⌘+Enter 儲存，Esc 取消)"></textarea>
+            <div class="bar">
+              <button id="btnSave" class="primary">儲存 <kbd>Ctrl+Enter</kbd></button>
+              <button id="btnCancel">取消 <kbd>Esc</kbd></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="bar" style="margin-top:0; margin-bottom:8px">
+      <strong>修改清單</strong><span id="count" class="muted small"></span>
+      <span class="spacer" style="flex:1"></span>
+      <label class="small"><input type="checkbox" id="hideDone"> 隱藏已完成</label>
+    </div>
+    <div id="list"><div class="muted small">還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。</div></div>
+  </section>
+</main>
+
+<dialog id="settings">
+  <form method="dialog">
+    <h3 style="margin-top:0">設定</h3>
+    <div class="bar" style="margin-top:0">
+      <label style="flex:1">FPS（這支影片）
+        <select id="fps">
+          <option>23.976</option><option>24</option><option>25</option><option selected>29.97</option>
+          <option>30</option><option>50</option><option>59.94</option><option>60</option>
+        </select>
+      </label>
+      <label style="flex:1">起始時間碼 <input id="startTc" type="text" value="00:00:00:00"></label>
+    </div>
+    <label>審片人（會寫進修改表）</label>
+    <input id="setReviewer" type="text" placeholder="例如：阿湯">
+    <label>語音辨識引擎</label>
+    <select id="setEngine">
+      <option value="elevenlabs">ElevenLabs Scribe v2（推薦：中英夾雜最準，可加專有名詞）</option>
+      <option value="openai">OpenAI gpt-4o-transcribe</option>
+      <option value="browser">瀏覽器內建（免費、即時，Chrome / Edge；中英夾雜較弱）</option>
+    </select>
+    <label>ElevenLabs API Key</label>
+    <input id="setElKey" type="password" placeholder="xi-api-key" autocomplete="off">
+    <label>OpenAI API Key</label>
+    <input id="setOaKey" type="password" placeholder="sk-..." autocomplete="off">
+    <label>專有名詞 / 常講的英文（一行一個，提高辨識率）</label>
+    <textarea id="setTerms" placeholder="例如：&#10;Logo&#10;Super&#10;B-roll&#10;調光&#10;安達人壽"></textarea>
+    <label>AI 潤飾：Anthropic API Key</label>
+    <input id="setAnKey" type="password" placeholder="sk-ant-..." autocomplete="off">
+    <label>AI 潤飾模型</label>
+    <select id="setPolishModel">
+      <option value="claude-opus-5-5">Claude Opus 5.5（最仔細）</option>
+      <option value="claude-sonnet-5-5">Claude Sonnet 5.5（較快）</option>
+      <option value="claude-haiku-5-5">Claude Haiku 5.5（最快、最便宜）</option>
+    </select>
+    <label style="font-weight:400"><input type="checkbox" id="setAutoPolish" style="width:auto"> 語音辨識完自動潤飾</label>
+    <label style="font-weight:400"><input type="checkbox" id="setPolishImage" style="width:auto"> 潤飾時附上該時間點截圖，讓 AI 看畫面寫得更具體</label>
+    <label>修改類別（逗號分隔）</label>
+    <input id="setCats" type="text">
+    <p class="small muted">API Key 只存在這台電腦的瀏覽器裡，錄音會直接送到你選的辨識服務。</p>
+    <div class="bar"><span class="spacer" style="flex:1"></span><button value="ok" class="primary">完成</button></div>
+  </form>
+</dialog>
+
+<div id="printView"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const video = $('#video');
+  const FPS = { '23.976': [24000/1001, 24, true], '24': [24, 24, false], '25': [25, 25, false],
+    '29.97': [30000/1001, 30, true], '30': [30, 30, false], '50': [50, 50, false],
+    '59.94': [60000/1001, 60, true], '60': [60, 60, false] };
+  const DEFAULT_CATS = '剪接,字幕,字卡/圖像,調色,音效/音樂,旁白,畫面/特效,其他';
+
+  // ---------- storage (always guarded) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  const settings = Object.assign({ reviewer: '', engine: 'elevenlabs', elKey: '', oaKey: '', terms: '', cats: DEFAULT_CATS,
+    anKey: '', polishModel: 'claude-opus-5-5', autoPolish: true, polishImage: true },
+    store.get('vrn.settings', {}));
+
+  let videoName = '', videoKey = '', notes = [], editing = null, activeId = null;
+
+  // ---------- timecode ----------
+  const fpsInfo = () => FPS[$('#fps').value];
+  const frameOf = t => Math.floor(t * fpsInfo()[0] + 1e-4);
+  function offsetFrames() {
+    const tb = fpsInfo()[1], m = $('#startTc').value.match(/^(\d+):(\d+):(\d+)[:;](\d+)$/);
+    return m ? ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * tb + +m[4] : 0;
+  }
+  function tcOfFrame(f) {
+    const tb = fpsInfo()[1]; f += offsetFrames();
+    const p = n => String(n).padStart(2, '0');
+    return `${p(Math.floor(f / (tb * 3600)))}:${p(Math.floor(f / (tb * 60)) % 60)}:${p(Math.floor(f / tb) % 60)}:${p(f % tb)}`;
+  }
+  const tcOf = t => tcOfFrame(frameOf(t));
+  function srtTime(t) {
+    const ms = Math.round(t * 1000), p = (n, w = 2) => String(n).padStart(w, '0');
+    return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+  }
+  // seek to the middle of a frame so the decoder lands on the right one
+  const seekFrame = f => { video.currentTime = Math.max(0, (f + 0.5) / fpsInfo()[0]); };
+
+  // ---------- Simplified → Traditional (Taiwan) ----------
+  let toTW = null;
+  function loadOpenCC() {
+    if (toTW || window.__occLoading) return;
+    window.__occLoading = true;
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js';
+    s.onload = () => { try { toTW = OpenCC.Converter({ from: 'cn', to: 'twp' }); } catch {} };
+    document.head.appendChild(s);
+  }
+  loadOpenCC();
+  const tw = s => (toTW ? toTW(s) : s);
+
+  // ---------- video loading ----------
+  $('#drop').onclick = () => $('#videoFile').click();
+  $('#videoFile').onchange = e => e.target.files[0] && loadVideo(e.target.files[0]);
+  for (const ev of ['dragover', 'dragenter']) document.addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.add('over'); });
+  document.addEventListener('dragleave', () => $('#drop').classList.remove('over'));
+  document.addEventListener('drop', e => {
+    e.preventDefault(); $('#drop').classList.remove('over');
+    const f = [...e.dataTransfer.files].find(f => f.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name));
+    if (f) loadVideo(f);
+  });
+  function loadVideo(file) {
+    video.removeAttribute('crossorigin'); $('#srcHint').textContent = '';
+    video.src = URL.createObjectURL(file);
+    openProject(file.name, `vrn.notes.${file.name}.${file.size}`);
+  }
+  // Share links -> direct media links. Dropbox streams well (supports range requests);
+  // Google Drive only works for small files and never allows screenshots (no CORS).
+  function directUrl(u) {
+    try {
+      const url = new URL(u.trim());
+      if (/(^|\.)dropbox\.com$/.test(url.hostname)) { url.searchParams.delete('dl'); url.searchParams.set('raw', '1'); return url.href; }
+      const m = url.hostname === 'drive.google.com' && (url.pathname.match(/\/d\/([^/]+)/) || [, url.searchParams.get('id')]);
+      if (m && m[1]) return `https://drive.google.com/uc?export=download&id=${m[1]}`;
+      return url.href;
+    } catch { return ''; }
+  }
+  function loadUrl(raw) {
+    const src = directUrl(raw);
+    if (!src) { $('#urlHint').textContent = '這不是有效的網址'; return; }
+    $('#urlHint').textContent = '載入中…';
+    let triedCors = false;
+    const ok = () => { cleanup(); $('#urlHint').textContent = ''; };
+    $('#srcHint').textContent = '';
+    const fail = () => {
+      if (!triedCors) { // server doesn't allow CORS: play anyway, but screenshots are blocked by the browser
+        triedCors = true; video.removeAttribute('crossorigin'); video.src = src;
+        status2('這個連結的伺服器不允許擷取畫面，可以播放和記錄，但不會有截圖。建議改用 Dropbox 連結或先下載到手機。');
+        return;
+      }
+      cleanup(); $('#urlHint').textContent = '影片載入失敗：連結需要能直接播放（Dropbox 分享連結、或 .mp4 直連）。Google Drive 大檔通常無法直接播放。';
+      $('#loader').hidden = false; $('#playerWrap').hidden = true;
+    };
+    const cleanup = () => { video.removeEventListener('loadeddata', ok); video.removeEventListener('error', fail); };
+    video.addEventListener('loadeddata', ok); video.addEventListener('error', fail);
+    video.crossOrigin = 'anonymous'; video.src = src;
+    const name = decodeURIComponent(new URL(src).pathname.split('/').pop() || '') || new URL(src).hostname;
+    openProject(name, 'vrn.notes.url.' + src.replace(/[?&](raw|dl)=\d/g, ''));
+  }
+  const status2 = t => { $('#srcHint').textContent = t; };
+  function openProject(name, key) {
+    videoName = name; videoKey = key;
+    const saved = store.get(videoKey, null);
+    notes = saved?.notes || [];
+    if (saved?.fps) $('#fps').value = saved.fps;
+    if (saved?.startTc) $('#startTc').value = saved.startTc;
+    $('#loader').hidden = true; $('#playerWrap').hidden = false;
+    $('#srcName').textContent = name;
+    $('#fpsBadge').textContent = $('#fps').value + 'fps';
+    document.title = `${videoName} – 影片修改對齊`;
+    render();
+  }
+  $('#urlForm').onsubmit = e => { e.preventDefault(); if ($('#videoUrl').value.trim()) loadUrl($('#videoUrl').value); };
+  $('#btnChange').onclick = () => { video.pause(); closeEditor(); $('#loader').hidden = false; $('#playerWrap').hidden = true; $('#urlHint').textContent = ''; };
+  $('#fpsBadge').onclick = () => openSettings();
+  const save = () => videoKey && store.set(videoKey, { notes, fps: $('#fps').value, startTc: $('#startTc').value });
+  $('#fps').onchange = $('#startTc').onchange = () => { save(); render(); updateTc(); $('#fpsBadge').textContent = $('#fps').value + 'fps'; };
+
+  // ---------- touch transport ----------
+  document.querySelector('.transport').addEventListener('click', e => {
+    const k = e.target.closest('button')?.dataset.step;
+    if (!k || !video.src) return;
+    const step = 1 / fpsInfo()[0];
+    if (k === 'play') { video.paused ? video.play() : video.pause(); return; }
+    if (k === 'prev' || k === 'next') { jumpNote(k === 'next' ? 1 : -1); return; }
+    video.pause();
+    const d = { '-1s': -1, '+1s': 1, '-1f': -step, '+1f': step }[k];
+    video.currentTime = Math.min(video.duration || Infinity, Math.max(0, video.currentTime + d));
+  });
+  const playIcon = () => { $('#btnPlay').textContent = video.paused ? '▶' : '❚❚'; };
+  video.addEventListener('play', playIcon); video.addEventListener('pause', playIcon);
+  function jumpNote(dir) {
+    const f = frameOf(video.currentTime), timed = notes.filter(n => !n.general);
+    const n = dir > 0 ? timed.find(n => n.frame > f) : [...timed].reverse().find(n => n.frame < f);
+    if (n) { video.pause(); activeId = n.id; seekFrame(n.frame); render(); }
+  }
+
+  // ---------- playhead ----------
+  function updateTc() {
+    $('#tc').textContent = tcOf(video.currentTime);
+    if (video.duration) $('#head').style.left = (video.currentTime / video.duration * 100) + '%';
+  }
+  video.addEventListener('timeupdate', updateTc);
+  video.addEventListener('seeked', updateTc);
+  video.addEventListener('loadedmetadata', () => { render(); updateTc(); });
+  (function tick() { if (!video.paused) updateTc(); requestAnimationFrame(tick); })();
+  $('#timeline').onclick = e => {
+    if (!video.duration || e.target.classList.contains('pin')) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    video.currentTime = (e.clientX - r.left) / r.width * video.duration;
+  };
+
+  function grabThumb() {
+    if (!video.videoWidth) return '';
+    const c = document.createElement('canvas'), w = 320;
+    c.width = w; c.height = Math.round(w * video.videoHeight / video.videoWidth);
+    c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+    try { return c.toDataURL('image/jpeg', 0.7); } catch { return ''; }
+  }
+
+  // ---------- editor ----------
+  const cats = () => settings.cats.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  // a general note (整體意見) has no timecode: t / frame are null
+  const label = n => n.general ? '整體意見' : tcOfFrame(n.frame);
+  const byTime = (a, b) => (a.general ? -1 : a.frame) - (b.general ? -1 : b.frame);
+  function openEditor(note, general = false) {
+    video.pause();
+    editing = note || { id: crypto.randomUUID?.() || String(Date.now()), t: video.currentTime, frame: frameOf(video.currentTime),
+      text: '', cat: cats()[0] || '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
+    $('#edCat').innerHTML = cats().map(c => `<option${c === editing.cat ? ' selected' : ''}>${esc(c)}</option>`).join('');
+    $('#edGeneral').checked = general || !!editing.general;
+    syncGeneral();
+    $('#edText').value = editing.text;
+    $('#recStatus').textContent = '';
+    $('#btnRaw').hidden = !editing.raw;
+    $('#editor').classList.add('open');
+    document.body.classList.add('editing');
+    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => $('#editor').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+  function syncGeneral() {
+    const g = $('#edGeneral').checked;
+    $('#edTc').textContent = g ? '整體意見（全片）' : tcOfFrame(editing.frame ?? frameOf(video.currentTime));
+    $('#edThumb').src = g ? '' : (editing.thumb || grabThumb());
+  }
+  $('#edGeneral').onchange = syncGeneral;
+  function closeEditor() {
+    if (rec.active) rec.stop(true);
+    editing = null; $('#editor').classList.remove('open'); document.body.classList.remove('editing'); document.activeElement?.blur();
+  }
+  function commit() {
+    if (!editing) return;
+    const text = $('#edText').value.trim();
+    if (!text) { closeEditor(); return; }
+    editing.text = text; editing.cat = $('#edCat').value;
+    if (editing.raw === text) delete editing.raw;
+    if ($('#edGeneral').checked) {
+      Object.assign(editing, { general: true, t: null, frame: null, thumb: '' });
+    } else if (editing.general || editing.frame == null) {
+      // a general note turned into a timed one takes the current playhead
+      Object.assign(editing, { general: false, t: video.currentTime, frame: frameOf(video.currentTime), thumb: grabThumb() });
+    }
+    if (editing.isNew) { delete editing.isNew; notes.push(editing); }
+    activeId = editing.id;
+    notes.sort(byTime);
+    save(); closeEditor(); render();
+  }
+  $('#btnAddText').onclick = () => { openEditor(); $('#edText').focus(); };
+  $('#btnAddGeneral').onclick = () => { openEditor(null, true); $('#edText').focus(); };
+  $('#btnAddVoice').onclick = () => { openEditor(); rec.start(); };
+  $('#btnRec').onclick = () => rec.active ? rec.stop() : rec.start();
+  $('#btnSave').onclick = commit;
+  $('#btnCancel').onclick = closeEditor;
+
+  // ---------- speech ----------
+  const rec = {
+    active: false, mr: null, chunks: [], sr: null, base: '',
+    start() {
+      if (this.active) return;
+      const engine = settings.engine;
+      if ((engine === 'elevenlabs' && !settings.elKey) || (engine === 'openai' && !settings.oaKey)) {
+        status('請先到「設定」填入 API Key，或改用瀏覽器內建辨識。'); openSettings(); return;
+      }
+      this.base = $('#edText').value ? $('#edText').value.replace(/\s*$/, '') + '\n' : '';
+      if (engine === 'browser') return this.startBrowser();
+      navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(stream => {
+        const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => window.MediaRecorder?.isTypeSupported?.(t)) || '';
+        this.mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+        this.chunks = [];
+        this.mr.ondataavailable = e => e.data.size && this.chunks.push(e.data);
+        this.mr.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          if (this.discard) return;
+          transcribe(new Blob(this.chunks, { type: this.mr.mimeType || 'audio/webm' }));
+        };
+        this.discard = false; this.mr.start(); this.active = true; recUi(true);
+        status('錄音中… 講完按「停止」或再按 V');
+      }).catch(err => status('無法使用麥克風：' + err.message));
+    },
+    startBrowser() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { status('這個瀏覽器不支援內建辨識，請用 Chrome / Edge，或改用 ElevenLabs / OpenAI。'); return; }
+      const sr = this.sr = new SR();
+      sr.lang = 'zh-TW'; sr.continuous = true; sr.interimResults = true;
+      let finalText = '';
+      sr.onresult = e => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
+        }
+        $('#edText').value = this.base + tw(finalText + interim);
+      };
+      sr.onerror = e => status('辨識錯誤：' + e.error);
+      sr.onend = () => { if (this.active) { this.active = false; recUi(false); status('辨識完成，可以直接修改文字再儲存。'); $('#edText').focus(); afterSpeech(); } };
+      sr.start(); this.active = true; recUi(true); status('聆聽中…（即時辨識）講完按「停止」或再按 V');
+    },
+    stop(discard = false) {
+      if (!this.active) return;
+      this.discard = discard;
+      if (this.sr) { this.sr.stop(); this.sr = null; if (discard) { this.active = false; recUi(false); } return; }
+      this.active = false; recUi(false);
+      this.mr?.state !== 'inactive' && this.mr.stop();
+    },
+  };
+  function recUi(on) {
+    $('#btnRec').textContent = on ? '⏹ 停止' : '🎙 錄音';
+    $('#btnRec').classList.toggle('rec', on);
+  }
+  const status = s => { $('#recStatus').textContent = s; };
+  const terms = () => settings.terms.split('\n').map(s => s.trim()).filter(Boolean);
+
+  async function transcribe(blob) {
+    const target = editing; // the note being edited when recording started
+    status('辨識中…');
+    try {
+      let text;
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+      if (settings.engine === 'elevenlabs') {
+        const fd = new FormData();
+        fd.append('file', blob, `note.${ext}`);
+        fd.append('model_id', 'scribe_v2');
+        fd.append('language_code', 'zho');
+        fd.append('tag_audio_events', 'false');
+        terms().slice(0, 100).forEach(t => fd.append('keyterms', t));
+        const r = await fetch('https://api.elevenlabs.io/v1/speech-to-text', { method: 'POST', headers: { 'xi-api-key': settings.elKey }, body: fd });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail?.message || JSON.stringify(j.detail || j));
+        text = j.text;
+      } else {
+        const fd = new FormData();
+        fd.append('file', blob, `note.${ext}`);
+        fd.append('model', 'gpt-4o-transcribe');
+        fd.append('language', 'zh');
+        fd.append('prompt', '以下是台灣影片後製的修改意見，使用繁體中文，夾雜英文術語，英文請保留原文。'
+          + (terms().length ? '常用詞：' + terms().join('、') + '。' : ''));
+        const r = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + settings.oaKey }, body: fd });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error?.message || JSON.stringify(j));
+        text = j.text;
+      }
+      text = tw((text || '').trim());
+      if (editing !== target) return;
+      $('#edText').value = rec.base + text;
+      status('辨識完成，可以直接修改文字再儲存。');
+      $('#edText').focus();
+      afterSpeech();
+    } catch (err) {
+      status('辨識失敗：' + err.message);
+    }
+  }
+  const afterSpeech = () => { if (settings.autoPolish && settings.anKey && $('#edText').value.trim()) polish(); };
+
+  // ---------- AI polish (Claude) ----------
+  const POLISH_SYSTEM = `你是台灣影片後製團隊的修改意見整理助手。使用者會給你審片人針對影片某個時間點（或整支影片）講的修改意見，通常是語音辨識結果，口語、有贅字、口頭禪、可能有辨識錯字，而且中英夾雜。
+
+請把它改寫成剪接師可以直接照著執行的修改指示：
+- 使用繁體中文（台灣用語）。英文術語、品牌名、專有名詞保留原文，例如 Logo、B-roll、Super、CTA、Fade in。
+- 去掉口頭禪、重複與語助詞，修正明顯的語音辨識錯字（可參考提供的常用詞）。
+- 寫清楚「改哪裡、改成什麼、怎麼改」。只有一件事就寫一兩句；有多件事就分點，每點以「1. 」「2. 」開頭。
+- 只根據原話整理，不要加入原話沒有的要求、數值或創意。原話不清楚、需要跟審片人確認的地方，在句末標註【待確認：要確認的內容】。
+- 如果附了截圖，只用來把原話裡「這裡、這個、那個字」對應到畫面上的具體元素（位置、顏色、文字內容），不要根據截圖自己提出新的修改。
+- 只輸出整理後的修改指示本身，不要前言、標題或說明。`;
+  let anthropic = null, lastPolished = null;
+  async function claudeClient() {
+    if (!anthropic || anthropic.__key !== settings.anKey) {
+      const { default: Anthropic } = await import('https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm');
+      anthropic = new Anthropic({ apiKey: settings.anKey, dangerouslyAllowBrowser: true });
+      anthropic.__key = settings.anKey;
+    }
+    return anthropic;
+  }
+  async function polish() {
+    if (!editing) return;
+    if (!settings.anKey) { status('請先到「設定」填入 Anthropic API Key 才能使用 AI 潤飾。'); openSettings(); return; }
+    const input = $('#edText').value.trim();
+    if (!input) { status('先輸入或講一段意見，再按潤飾。'); return; }
+    const target = editing;
+    // keep the very first spoken version as the raw text, even across repeated polishes
+    if (input !== lastPolished || !target.raw) target.raw = input;
+    const general = $('#edGeneral').checked;
+    const ctx = [`影片：${videoName}`, `位置：${general ? '整體意見（不指定時間碼）' : '時間碼 ' + $('#edTc').textContent}`,
+      `類別：${$('#edCat').value}`, terms().length ? `常用詞：${terms().join('、')}` : ''].filter(Boolean).join('\n');
+    const content = [];
+    const img = !general && settings.polishImage && $('#edThumb').src.startsWith('data:image/jpeg') ? $('#edThumb').src : '';
+    if (img) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: img.split(',')[1] } });
+    content.push({ type: 'text', text: `${ctx}\n\n<原話>\n${target.raw}\n</原話>` });
+    const btn = $('#btnPolish');
+    btn.disabled = true; status('AI 潤飾中…');
+    try {
+      const client = await claudeClient();
+      const model = settings.polishModel;
+      const msg = await client.beta.messages.create({
+        model, max_tokens: 4000,
+        output_config: { effort: 'low' },
+        // Haiku has no server-side fallback; Opus / Sonnet re-run a declined request on Anthropic's recommended model
+        ...(model === 'claude-haiku-5-5' ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }),
+        system: POLISH_SYSTEM,
+        messages: [{ role: 'user', content }],
+      });
+      if (msg.stop_reason === 'refusal') throw new Error('模型拒絕處理這段內容');
+      const out = tw(msg.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
+      if (!out) throw new Error('沒有回傳內容');
+      if (editing !== target) return;
+      $('#edText').value = lastPolished = out;
+      $('#btnRaw').hidden = false;
+      status('已潤飾。可以再手動調整；按「↶ 原始口述」可換回原話。');
+      $('#edText').focus();
+    } catch (err) {
+      status('AI 潤飾失敗：' + (err.error?.error?.message || err.message));
+    } finally { btn.disabled = false; }
+  }
+  $('#btnPolish').onclick = polish;
+  $('#btnRaw').onclick = () => { if (editing?.raw) { $('#edText').value = editing.raw; status('已換回原始口述。'); } };
+
+  // ---------- list ----------
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function render() {
+    const hide = $('#hideDone').checked, shown = notes.filter(n => !hide || !n.done);
+    $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}` : '';
+    $('#list').innerHTML = shown.length ? shown.map(n => `
+      <div class="note${n.done ? ' done' : ''}${n.general ? ' general' : ''}${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
+        <img src="${n.thumb || ''}" data-act="seek" alt="">
+        <div>
+          <div class="meta">
+            <button class="tcbtn" data-act="seek">${label(n)}</button>
+            <span class="chip">#${notes.indexOf(n) + 1}</span>
+            ${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}
+            ${n.by ? `<span class="small muted">${esc(n.by)}</span>` : ''}
+          </div>
+          <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
+          ${n.raw ? `<details class="small muted"><summary>原始口述</summary>${esc(n.raw)}</details>` : ''}
+          <div class="actions">
+            <button data-act="done">${n.done ? '↺ 未完成' : '✓ 已修改'}</button>
+            <button data-act="edit">編輯</button>
+            <button data-act="del">刪除</button>
+          </div>
+        </div>
+      </div>`).join('') : `<div class="muted small">${notes.length ? '全部完成了 🎉' : '還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。'}</div>`;
+    const tl = $('#timeline');
+    tl.querySelectorAll('.pin').forEach(p => p.remove());
+    if (video.duration) for (const n of notes.filter(n => !n.general)) {
+      const p = document.createElement('div');
+      p.className = 'pin' + (n.done ? ' done' : '');
+      p.style.left = (n.t / video.duration * 100) + '%';
+      p.title = `${tcOfFrame(n.frame)} ${n.text}`;
+      p.onclick = () => { activeId = n.id; seekFrame(n.frame); render(); };
+      tl.appendChild(p);
+    }
+  }
+  $('#hideDone').onchange = render;
+  $('#list').addEventListener('click', e => {
+    const act = e.target.dataset.act, el = e.target.closest('.note');
+    if (!act || !el) return;
+    const n = notes.find(n => n.id === el.dataset.id);
+    if (act === 'seek') { video.pause(); activeId = n.id; if (!n.general) seekFrame(n.frame); render(); }
+    if (act === 'done') { n.done = !n.done; save(); render(); }
+    if (act === 'edit') { if (!n.general) seekFrame(n.frame); openEditor(n); $('#edText').focus(); }
+    if (act === 'del' && confirm(`刪除「${label(n)}」這則意見？`)) { notes.splice(notes.indexOf(n), 1); save(); render(); }
+  });
+  $('#list').addEventListener('blur', e => {
+    if (e.target.dataset.act !== 'text') return;
+    const n = notes.find(n => n.id === e.target.closest('.note').dataset.id);
+    const v = e.target.innerText.trim();
+    if (n && v && v !== n.text) { n.text = v; save(); }
+  }, true);
+
+  // ---------- keyboard ----------
+  document.addEventListener('keydown', e => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+    if (editing && e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
+    if (editing && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); return; }
+    if (typing || $('#settings').open || !video.src) return;
+    const step = 1 / fpsInfo()[0];
+    switch (e.key) {
+      case ' ': case 'k': case 'K': e.preventDefault(); video.paused && e.key === ' ' ? video.play() : video.pause(); video.playbackRate = 1; break;
+      case 'Enter': e.preventDefault(); if (!editing) { openEditor(); $('#edText').focus(); } break;
+      case 'g': case 'G': e.preventDefault(); if (!editing) { openEditor(null, true); $('#edText').focus(); } break;
+      case 'v': case 'V': e.preventDefault(); if (rec.active) rec.stop(); else { if (!editing) openEditor(); rec.start(); } break;
+      case 'ArrowLeft': e.preventDefault(); video.pause(); video.currentTime = Math.max(0, video.currentTime - (e.shiftKey ? 1 : step)); break;
+      case 'ArrowRight': e.preventDefault(); video.pause(); video.currentTime = Math.min(video.duration, video.currentTime + (e.shiftKey ? 1 : step)); break;
+      case 'l': case 'L': video.playbackRate = video.paused ? 1 : Math.min(4, video.playbackRate * 2); video.play(); break;
+      case 'j': case 'J': video.pause(); video.currentTime = Math.max(0, video.currentTime - 5); break;
+      case '[': case ']': jumpNote(e.key === ']' ? 1 : -1); break;
+    }
+  });
+
+  // ---------- export ----------
+  const base = () => (videoName.replace(/\.[^.]+$/, '') || '影片') + '_修改表';
+  async function download(name, content, type) {
+    $('#exportMenu').open = false;
+    // on phones, open the share sheet (LINE, Mail, Files…) instead of a bare download
+    if (matchMedia('(pointer: coarse)').matches && navigator.canShare) {
+      const file = new File([content], name, { type: type.split(';')[0] });
+      if (navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: name }); return; }
+        catch (err) { if (err.name === 'AbortError') return; } // other errors (e.g. expired user gesture) fall through to a download
+      }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([content], { type }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const rows = () => notes.map((n, i) => [i + 1, label(n), n.general ? '' : n.t.toFixed(3), n.cat, n.text, n.done ? '已修改' : '待修改', n.by || '', n.raw || '']);
+  const timedNotes = () => notes.filter(n => !n.general);
+  const HEAD = ['編號', '時間碼', '秒數', '類別', '修改內容', '狀態', '審片人', '原始口述'];
+  const need = () => notes.length || (alert('還沒有任何意見'), false);
+
+  $('#btnCsv').onclick = () => {
+    if (!need()) return;
+    const q = v => `"${String(v).replace(/"/g, '""')}"`;
+    download(base() + '.csv', '\ufeff' + [HEAD, ...rows()].map(r => r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+  };
+  $('#btnCopy').onclick = async () => {
+    if (!need()) return;
+    const clean = v => String(v).replace(/[\t\r\n]+/g, ' ');
+    const tsv = [HEAD, ...rows()].map(r => r.map(clean).join('\t')).join('\n');
+    try { await navigator.clipboard.writeText(tsv); alert('已複製，直接貼到 Excel 或 Google 試算表即可'); }
+    catch { download(base() + '.tsv', tsv, 'text/tab-separated-values'); }
+  };
+  $('#btnSrt').onclick = () => {
+    if (!need()) return;
+    const timed = timedNotes();
+    if (!timed.length) return alert('沒有指定時間碼的意見');
+    const srt = timed.map((n, i) => {
+      const end = Math.min(n.t + 3, timed[i + 1] ? timed[i + 1].t : Infinity, video.duration || Infinity);
+      return `${i + 1}\n${srtTime(n.t)} --> ${srtTime(Math.max(end, n.t + 0.5))}\n#${notes.indexOf(n) + 1} [${n.cat}] ${n.text}\n`;
+    }).join('\n');
+    download(base() + '.srt', srt, 'text/plain;charset=utf-8');
+  };
+  $('#btnJson').onclick = () => {
+    if (!need()) return;
+    download(base() + '.json', JSON.stringify({ video: videoName, fps: $('#fps').value, startTc: $('#startTc').value, notes }, null, 2), 'application/json');
+  };
+  $('#btnImport').onclick = () => $('#importFile').click();
+  $('#importFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const have = new Set(notes.map(n => n.id));
+      const added = (data.notes || []).filter(n => !have.has(n.id));
+      // re-derive frames in case the other reviewer used a different fps setting
+      added.forEach(n => { n.frame = n.general ? null : frameOf(n.t); });
+      notes.push(...added); notes.sort(byTime);
+      save(); render(); alert(`合併了 ${added.length} 則意見`);
+    } catch (err) { alert('無法讀取：' + err.message); }
+  };
+  $('#btnXml').onclick = () => {
+    if (!need()) return;
+    const [, tb, ntsc] = fpsInfo(), x = esc;
+    const timed = timedNotes();
+    if (!timed.length) return alert('沒有指定時間碼的意見');
+    const dur = Math.max(1, Math.ceil((video.duration || timed.at(-1).t + 1) * fpsInfo()[0]));
+    const rate = `<rate><timebase>${tb}</timebase><ntsc>${ntsc ? 'TRUE' : 'FALSE'}</ntsc></rate>`;
+    const w = video.videoWidth || 1920, h = video.videoHeight || 1080;
+    const markers = timed.map(n =>
+      `<marker><name>${x(`#${notes.indexOf(n) + 1} ${n.cat}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${n.frame}</in><out>-1</out></marker>`).join('\n      ');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xmeml>
+<xmeml version="4">
+  <sequence id="sequence-1">
+    <name>${x(base())}</name>
+    <duration>${dur}</duration>
+    ${rate}
+    <timecode>${rate}<string>${x($('#startTc').value)}</string><frame>${offsetFrames()}</frame><displayformat>NDF</displayformat></timecode>
+    <media>
+      <video>
+        <format><samplecharacteristics>${rate}<width>${w}</width><height>${h}</height><pixelaspectratio>square</pixelaspectratio></samplecharacteristics></format>
+        <track>
+          <clipitem id="clipitem-1">
+            <name>${x(videoName)}</name><duration>${dur}</duration>${rate}
+            <start>0</start><end>${dur}</end><in>0</in><out>${dur}</out>
+            <file id="file-1">
+              <name>${x(videoName)}</name><pathurl>${x(encodeURI(videoName))}</pathurl>${rate}<duration>${dur}</duration>
+              <media><video><samplecharacteristics><width>${w}</width><height>${h}</height></samplecharacteristics></video><audio><channelcount>2</channelcount></audio></media>
+            </file>
+          </clipitem>
+        </track>
+      </video>
+      <audio>
+        <track>
+          <clipitem id="clipitem-2">
+            <name>${x(videoName)}</name><duration>${dur}</duration>${rate}
+            <start>0</start><end>${dur}</end><in>0</in><out>${dur}</out>
+            <file id="file-1"/>
+            <sourcetrack><mediatype>audio</mediatype><trackindex>1</trackindex></sourcetrack>
+          </clipitem>
+        </track>
+      </audio>
+    </media>
+      ${markers}
+  </sequence>
+</xmeml>
+`;
+    download(base() + '_Premiere標記.xml', xml, 'application/xml');
+  };
+  // ---------- document export (screenshots + text) ----------
+  const loadScript = src => new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) return res();
+    const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 ' + src));
+    document.head.appendChild(s);
+  });
+  function waitSeek(f) {
+    return new Promise(res => {
+      let done = false;
+      const fin = () => { if (done) return; done = true; video.removeEventListener('seeked', fin); requestAnimationFrame(() => res()); };
+      video.addEventListener('seeked', fin); setTimeout(fin, 2000);
+      seekFrame(f);
+    });
+  }
+  // re-grab each timed note at full resolution (the stored thumbnails are small to keep storage light)
+  async function captureFrames(btn) {
+    const label0 = btn.textContent, back = video.currentTime, out = {};
+    video.pause();
+    const timed = timedNotes();
+    for (let i = 0; i < timed.length; i++) {
+      btn.textContent = `擷取畫面 ${i + 1}/${timed.length}…`;
+      await waitSeek(timed[i].frame);
+      const c = document.createElement('canvas'), w = Math.min(1280, video.videoWidth || 1280);
+      c.width = w; c.height = Math.round(w * (video.videoHeight || 720) / (video.videoWidth || 1280));
+      c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+      try { out[timed[i].id] = { url: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height }; } catch { break; } // cross-origin video: no screenshots
+    }
+    video.currentTime = back; btn.textContent = label0;
+    return out;
+  }
+  const reviewers = () => [...new Set(notes.map(n => n.by).filter(Boolean))].join('、');
+  function reportHtml(shots) {
+    const general = notes.filter(n => n.general), timed = timedNotes();
+    const st = n => `<span class="st ${n.done ? 'ok' : ''}">${n.done ? '已修改' : '待修改'}</span>`;
+    const by = n => n.by ? `<div class="by">— ${esc(n.by)}</div>` : '';
+    return `<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(base())}</title><style>
+body{font:14px/1.6 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1c1917;background:#fff;max-width:1000px;margin:0 auto;padding:24px 16px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 10px;border-bottom:2px solid #1c1917;padding-bottom:4px}
+.meta{color:#57534e;font-size:13px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d6d3d1;padding:8px;vertical-align:top;text-align:left}
+th{background:#f5f5f4;font-size:13px}td.n{width:32px;text-align:center}td.img{width:300px}td.img img{width:100%;display:block;border-radius:4px}
+.tc{font:600 14px ui-monospace,Menlo,monospace}.cat{display:inline-block;background:#f1f5f9;border-radius:999px;padding:0 8px;font-size:12px;margin-top:4px}
+.txt{white-space:pre-wrap}.by{color:#78716c;font-size:12px;margin-top:4px}.st{font-size:12px;color:#b45309}.st.ok{color:#15803d}
+ol.g li{margin:6px 0}@media print{body{padding:0}tr{page-break-inside:avoid}}
+</style></head><body>
+<h1>${esc(base())}</h1>
+<div class="meta">影片：${esc(videoName)}　FPS：${esc($('#fps').value)}　${reviewers() ? '審片：' + esc(reviewers()) + '　' : ''}產出：${new Date().toLocaleString('zh-TW')}<br>
+共 ${notes.length} 則（整體 ${general.length}、逐點 ${timed.length}），已修改 ${notes.filter(n => n.done).length}</div>
+${general.length ? `<h2>整體意見</h2><ol class="g">${general.map(n => `<li><span class="cat">${esc(n.cat)}</span> <span class="txt">${esc(n.text)}</span> ${st(n)}${by(n)}</li>`).join('')}</ol>` : ''}
+${timed.length ? `<h2>逐點修改</h2><table><tr><th>#</th><th>畫面</th><th>時間碼 / 類別</th><th>修改內容</th></tr>
+${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">${shots[n.id] ? `<img src="${shots[n.id].url}" alt="">` : ''}</td>
+<td><div class="tc">${tcOfFrame(n.frame)}</div><div class="cat">${esc(n.cat)}</div></td>
+<td><div class="txt">${esc(n.text)}</div>${by(n)}<div>${st(n)}</div></td></tr>`).join('')}</table>` : ''}
+</body></html>`;
+  }
+  async function withBusy(btn, fn) {
+    if (!need() || btn.disabled) return;
+    btn.disabled = true;
+    try { await fn(); } catch (err) { alert('匯出失敗：' + err.message); } finally { btn.disabled = false; }
+  }
+  $('#btnReport').onclick = e => withBusy(e.currentTarget, async () => {
+    download(base() + '.html', reportHtml(await captureFrames(e.currentTarget)), 'text/html;charset=utf-8');
+  });
+  $('#btnPrint').onclick = e => withBusy(e.currentTarget, async () => {
+    const html = reportHtml(await captureFrames(e.currentTarget));
+    $('#printView').innerHTML = html.slice(html.indexOf('<style>'), html.indexOf('</style>') + 8) + html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'));
+    await Promise.all([...$('#printView').querySelectorAll('img')].map(i => i.decode?.().catch(() => {})));
+    window.print();
+  });
+  // the report's <style> is injected for printing only; drop it so it can't restyle the app
+  window.addEventListener('afterprint', () => { $('#printView').innerHTML = ''; });
+  $('#btnDocx').onclick = e => withBusy(e.currentTarget, async () => {
+    const btn = e.currentTarget;
+    btn.textContent = '載入中…';
+    await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js');
+    btn.textContent = '文件 (Word)';
+    const shots = await captureFrames(btn);
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, ShadingType } = window.docx;
+    const font = { ascii: 'Calibri', hAnsi: 'Calibri', eastAsia: 'Microsoft JhengHei' };
+    const lines = (text, opts = {}) => String(text).split('\n').map((t, i) => new TextRun({ text: t, break: i ? 1 : 0, ...opts }));
+    const P = (text, opts = {}) => new Paragraph({ children: lines(text, opts) });
+    const bytes = url => Uint8Array.from(atob(url.split(',')[1]), c => c.charCodeAt(0));
+    const cell = (children, pct, head) => new TableCell({ children, width: { size: pct, type: WidthType.PERCENTAGE },
+      ...(head ? { shading: { type: ShadingType.CLEAR, fill: 'F5F5F4', color: 'auto' } } : {}) });
+    const status = n => P(n.done ? '已修改' : '待修改', { color: n.done ? '15803D' : 'B45309', size: 18 });
+    const general = notes.filter(n => n.general), timed = timedNotes();
+    const children = [
+      new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(base())] }),
+      P(`影片：${videoName}　FPS：${$('#fps').value}${reviewers() ? '　審片：' + reviewers() : ''}`, { color: '57534E', size: 20 }),
+      P(`產出：${new Date().toLocaleString('zh-TW')}　共 ${notes.length} 則（整體 ${general.length}、逐點 ${timed.length}），已修改 ${notes.filter(n => n.done).length}`, { color: '57534E', size: 20 }),
+    ];
+    if (general.length) {
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('整體意見')] }));
+      general.forEach((n, i) => children.push(new Paragraph({ children: [
+        new TextRun({ text: `${i + 1}. `, bold: true }), new TextRun({ text: `[${n.cat}] `, color: '2563EB' }),
+        ...lines(n.text), new TextRun({ text: `　${n.done ? '已修改' : '待修改'}${n.by ? '　— ' + n.by : ''}`, color: '78716C', size: 18 })] })));
+    }
+    if (timed.length) {
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('逐點修改')] }));
+      const head = new TableRow({ tableHeader: true, children: ['#', '畫面', '時間碼 / 類別', '修改內容'].map((h, i) =>
+        cell([P(h, { bold: true })], [6, 40, 18, 36][i], true)) });
+      const body = timed.map(n => {
+        const s = shots[n.id], w = 230;
+        return new TableRow({ cantSplit: true, children: [
+          cell([P(String(notes.indexOf(n) + 1))], 6),
+          cell([new Paragraph({ children: s ? [new ImageRun({ data: bytes(s.url), transformation: { width: w, height: Math.round(w * s.h / s.w) } })] : [] })], 40),
+          cell([P(tcOfFrame(n.frame), { bold: true, font: 'Consolas' }), P(n.cat, { color: '2563EB', size: 18 })], 18),
+          cell([P(n.text), ...(n.by ? [P('— ' + n.by, { color: '78716C', size: 18 })] : []), status(n)], 36),
+        ] });
+      });
+      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [head, ...body] }));
+    }
+    const doc = new Document({ styles: { default: { document: { run: { font, size: 21 } } } },
+      sections: [{ properties: { page: { margin: { top: 1000, bottom: 1000, left: 900, right: 900 } } }, children }] });
+    download(base() + '.docx', await Packer.toBlob(doc), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  });
+
+  // ---------- settings ----------
+  function openSettings() {
+    $('#setReviewer').value = settings.reviewer; $('#setEngine').value = settings.engine;
+    $('#setElKey').value = settings.elKey; $('#setOaKey').value = settings.oaKey;
+    $('#setTerms').value = settings.terms; $('#setCats').value = settings.cats;
+    $('#setAnKey').value = settings.anKey; $('#setPolishModel').value = settings.polishModel;
+    $('#setAutoPolish').checked = settings.autoPolish; $('#setPolishImage').checked = settings.polishImage;
+    $('#settings').showModal();
+  }
+  $('#btnSettings').onclick = openSettings;
+  $('#settings').addEventListener('close', () => {
+    Object.assign(settings, { reviewer: $('#setReviewer').value.trim(), engine: $('#setEngine').value,
+      elKey: $('#setElKey').value.trim(), oaKey: $('#setOaKey').value.trim(), terms: $('#setTerms').value,
+      cats: $('#setCats').value.trim() || DEFAULT_CATS, anKey: $('#setAnKey').value.trim(),
+      polishModel: $('#setPolishModel').value, autoPolish: $('#setAutoPolish').checked, polishImage: $('#setPolishImage').checked });
+    store.set('vrn.settings', settings);
+  });
+})();
+</script>
+</body>
+</html>
