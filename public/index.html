@@ -130,6 +130,20 @@
     body.portrait .transport { flex-wrap: wrap; width: 100%; }
   }
   #stage { scroll-margin-top: 84px; }
+  /* collapsible notes column */
+  #listRail { display: none; }
+  @media (min-width: 901px) {
+    body.listCollapsed main, body.portrait.listCollapsed main { grid-template-columns: minmax(0, 1fr) 64px; }
+    body.listCollapsed #listPanel { padding: 8px; }
+    body.listCollapsed #listPanel > :not(#listRail) { display: none !important; }
+    body.listCollapsed #listRail { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; height: 100%;
+      min-height: 220px; justify-content: flex-start; padding: 12px 0; }
+    body.listCollapsed #listRail .railText { writing-mode: vertical-rl; letter-spacing: 4px; font-size: 13px; }
+    body.listCollapsed video { max-height: 74vh; }
+  }
+  @media (max-width: 900px) {
+    body.listCollapsed #listPanel .listBody, body.listCollapsed #statusBar { display: none !important; }
+  }
   body.portrait .note { grid-template-columns: 64px 1fr; }
   body.portrait .note img { width: 64px; }
   body.portrait #editor img { width: 96px; }
@@ -386,7 +400,10 @@
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="listPanel">
+    <button id="listRail" class="ghost" title="展開修改清單" aria-label="展開修改清單">
+      <i data-ic="panelOpen"></i><span id="railCount" class="chip"></span><span class="railText">修改清單</span>
+    </button>
     <div id="statusBar" class="bar serverOnly" hidden>
       <span>審核狀態：<strong id="statusText"></strong></span>
       <span class="spacer" style="flex:1"></span>
@@ -399,9 +416,10 @@
     <div class="bar" style="margin-top:0; margin-bottom:8px">
       <strong>修改清單</strong><span id="count" class="muted small"></span>
       <span class="spacer" style="flex:1"></span>
-      <label class="small"><input type="checkbox" id="hideDone"> 隱藏已完成</label>
+      <label class="small listBody"><input type="checkbox" id="hideDone"> 隱藏已完成</label>
+      <button id="btnCollapse" class="ghost iconBtn" title="收起修改清單" aria-label="收起修改清單"><i data-ic="panelClose"></i></button>
     </div>
-    <div id="list"><div class="muted small">還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。</div></div>
+    <div id="list" class="listBody"><div class="muted small">還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。</div></div>
   </section>
 </main>
 
@@ -544,6 +562,8 @@
     alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
     film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
     playCircle: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/>',
+    panelClose: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M9 10l2 2-2 2"/>',
+    panelOpen: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M11 10l-2 2 2 2"/>',
   };
   const ic = name => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
   document.querySelectorAll('i[data-ic]').forEach(el => { el.outerHTML = ic(el.dataset.ic); });
@@ -1119,6 +1139,7 @@
   function render() {
     const hide = $('#hideDone').checked, shown = notes.filter(n => !hide || !n.done);
     $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}` : '';
+    $('#railCount').textContent = notes.length; $('#railCount').hidden = !notes.length;
     $('#list').innerHTML = shown.length ? shown.map(n => `
       <div class="note${n.done ? ' done' : ''}${n.general ? ' general' : ''}${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
         <img src="${n.thumb || ''}" data-act="seek" alt="">
@@ -1151,6 +1172,15 @@
     }
   }
   $('#hideDone').onchange = render;
+  const setCollapsed = on => {
+    document.body.classList.toggle('listCollapsed', on); store.set('vrn.listCollapsed', on);
+    $('#btnCollapse').innerHTML = ic(on ? 'panelOpen' : 'panelClose');
+    $('#btnCollapse').title = on ? '展開修改清單' : '收起修改清單';
+    refreshPt();
+  };
+  $('#btnCollapse').onclick = () => setCollapsed(!document.body.classList.contains('listCollapsed'));
+  $('#listRail').onclick = () => setCollapsed(false);
+  setCollapsed(!!store.get('vrn.listCollapsed', false));
   $('#list').addEventListener('click', e => {
     const act = e.target.dataset.act, el = e.target.closest('.note');
     if (!act || !el) return;
