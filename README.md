@@ -33,6 +33,8 @@
 
 ## 雲端版設定（一次性，約 30 分鐘）
 
+> 完整圖文步驟（含 ElevenLabs、Anthropic、Resend API Key 申請、資料夾權限、測試清單）見 [docs/SETUP.md](docs/SETUP.md)。
+
 ### 1. Google：建立服務帳戶，讓後端讀你的 Drive 資料夾
 
 1. 打開 https://console.cloud.google.com/ ，建立或選一個專案。
