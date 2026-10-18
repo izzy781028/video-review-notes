@@ -1,0 +1,9 @@
+{
+  "name": "clipnote",
+  "private": true,
+  "type": "module",
+  "description": "片語 Clipnote – video review notes with timecodes, voice input and share links",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0"
+  }
+}

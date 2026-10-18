@@ -1,0 +1,1650 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="片語">
+<title>片語 Clipnote</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e9ecf6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12121b" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400..700&display=swap">
+<style>
+  /* "Liquid glass" theme: soft color blobs behind frosted cards. Light by default, dark via system or toggle. */
+  :root {
+    color-scheme: light;
+    --bg: #e9ecf6; --blob-1: #b9a8ff; --blob-2: #9fd0ff; --blob-3: #ffb8d9; --blob-4: #a8f0dc;
+    --glass: linear-gradient(145deg, rgba(255,255,255,.66), rgba(255,255,255,.34));
+    --glass-strong: rgba(255,255,255,.72); --glass-flat: rgba(255,255,255,.5); --glass-border: rgba(255,255,255,.7);
+    --shadow: 0 18px 44px rgba(76,70,140,.16), 0 2px 6px rgba(76,70,140,.06), inset 0 1px 0 rgba(255,255,255,.9);
+    --shadow-soft: 0 6px 18px rgba(76,70,140,.12), inset 0 1px 0 rgba(255,255,255,.85);
+    --inset: inset 0 2px 6px rgba(76,70,140,.12), inset 0 -1px 0 rgba(255,255,255,.8);
+    --sheet-bg: linear-gradient(145deg, rgba(255,255,255,.92), rgba(255,255,255,.82));
+    --ink: #1d1b2e; --ink-2: #565569; --muted: #7f7f93; --line: rgba(29,27,46,.10);
+    --accent: #6250d6; --accent-soft: rgba(98,80,214,.12); --accent-ink: #fff;
+    --hero-from: #6f7cf5; --hero-to: #8a5cf0;
+    --good: #0ca30c; --warning: #b07800; --rec: #d03b3b; --done: #0ca30c; --chip: rgba(98,80,214,.10);
+    --panel: var(--glass-strong);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #12121b; --blob-1: #3b2a8a; --blob-2: #133f6e; --blob-3: #6a1f4c; --blob-4: #0f4c44;
+    --glass: linear-gradient(145deg, rgba(60,60,84,.55), rgba(30,30,44,.4));
+    --glass-strong: rgba(52,52,72,.78); --glass-flat: rgba(48,48,66,.5); --glass-border: rgba(255,255,255,.1);
+    --shadow: 0 18px 44px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+    --shadow-soft: 0 6px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.1);
+    --inset: inset 0 2px 6px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.05);
+    --sheet-bg: linear-gradient(145deg, rgba(54,54,76,.95), rgba(34,34,48,.92));
+    --ink: #f0eff6; --ink-2: #c2c1d2; --muted: #8f8ea3; --line: rgba(255,255,255,.10);
+    --accent: #9085e9; --accent-soft: rgba(144,133,233,.16); --hero-from: #4e57c9; --hero-to: #6c45c4;
+    --good: #2fbf4a; --warning: #fab219; --rec: #e66767; --done: #2fbf4a; --chip: rgba(144,133,233,.16);
+  } }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #12121b; --blob-1: #3b2a8a; --blob-2: #133f6e; --blob-3: #6a1f4c; --blob-4: #0f4c44;
+    --glass: linear-gradient(145deg, rgba(60,60,84,.55), rgba(30,30,44,.4));
+    --glass-strong: rgba(52,52,72,.78); --glass-flat: rgba(48,48,66,.5); --glass-border: rgba(255,255,255,.1);
+    --shadow: 0 18px 44px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+    --shadow-soft: 0 6px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.1);
+    --inset: inset 0 2px 6px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.05);
+    --sheet-bg: linear-gradient(145deg, rgba(54,54,76,.95), rgba(34,34,48,.92));
+    --ink: #f0eff6; --ink-2: #c2c1d2; --muted: #8f8ea3; --line: rgba(255,255,255,.10);
+    --accent: #9085e9; --accent-soft: rgba(144,133,233,.16); --hero-from: #4e57c9; --hero-to: #6c45c4;
+    --good: #2fbf4a; --warning: #fab219; --rec: #e66767; --done: #2fbf4a; --chip: rgba(144,133,233,.16);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); min-height: 100vh; -webkit-font-smoothing: antialiased;
+    font: 450 14px/1.55 "Noto Sans TC", system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; transition: background-color .4s; }
+  body::before { content: ""; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
+    background: radial-gradient(42vmax 42vmax at 6% 8%, var(--blob-1), transparent 62%), radial-gradient(38vmax 38vmax at 96% 14%, var(--blob-2), transparent 62%),
+      radial-gradient(40vmax 40vmax at 72% 98%, var(--blob-3), transparent 62%), radial-gradient(34vmax 34vmax at 10% 92%, var(--blob-4), transparent 62%); }
+  .glass, .panel, header, dialog, .menu-list {
+    background: var(--glass); -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%);
+    border: 1px solid var(--glass-border); box-shadow: var(--shadow); }
+  header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; margin: 12px 16px 0; border-radius: 22px;
+    position: sticky; top: 8px; z-index: 5; }
+  header h1 { white-space: nowrap; flex: none; font-size: 18px; font-weight: 700; margin: 0 8px 0 0; letter-spacing: .5px; display: flex; align-items: center; gap: 8px; }
+  .brand-mark { width: 32px; height: 32px; flex: none; filter: drop-shadow(0 4px 10px rgba(59,43,255,.3)); }
+  header .spacer { flex: 1; }
+  button, select, input[type=text], input[type=password], input[type=url], textarea {
+    font: inherit; color: var(--ink); background: var(--glass-strong); border: 1px solid var(--glass-border); border-radius: 12px; }
+  input[type=text], input[type=password], input[type=url], textarea, select { box-shadow: var(--inset); }
+  button { padding: 7px 12px; cursor: pointer; white-space: nowrap; box-shadow: var(--shadow-soft); transition: transform .12s, background .2s; }
+  button:hover { background: var(--accent-soft); }
+  button, .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .ic { width: 18px; height: 18px; flex: none; }
+  .iconBtn { padding: 7px 9px; }
+  button.ghost { background: transparent; box-shadow: none; border-color: transparent; color: var(--ink-2); }
+  button.ghost:hover { background: var(--accent-soft); color: var(--accent); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .seg { display: inline-flex; flex-wrap: nowrap; gap: 2px; padding: 3px; border-radius: 14px; background: var(--glass-strong);
+    box-shadow: var(--shadow-soft); border: 1px solid var(--glass-border); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg button { background: transparent; border: 0; box-shadow: none; border-radius: 11px; padding: 6px 12px; color: var(--ink-2); font-size: 13px; }
+  .seg button:hover { background: var(--accent-soft); color: var(--accent); }
+  .seg button.on, .seg #btnPlay { background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); color: #fff; }
+  #statusBar button.on { box-shadow: none; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  .edActions { margin-top: 8px; }
+  .kbdhint { opacity: .75; }
+  .iconLabel { display: inline-flex; align-items: center; gap: 6px; }
+  .iconLabel .ic { color: var(--accent); }
+  .menu-list button { justify-content: flex-start; }
+  .menu-list .ic { color: var(--accent); }
+  .tour-step .badge { width: 64px; height: 64px; margin: 4px auto 0; border-radius: 20px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); box-shadow: 0 10px 24px rgba(98,80,214,.35), inset 0 1px 0 rgba(255,255,255,.45); }
+  .tour-step .badge .ic { width: 30px; height: 30px; }
+  #gate .badge { width: 56px; height: 56px; margin: 0 auto; border-radius: 18px; display: grid; place-items: center; color: var(--accent);
+    background: var(--glass-strong); box-shadow: var(--shadow-soft); }
+  #gate .badge .ic { width: 26px; height: 26px; }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .55; cursor: default; }
+  button.primary, .btn.primary { background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); color: #fff; border-color: rgba(255,255,255,.35);
+    box-shadow: 0 6px 16px rgba(98,80,214,.35), inset 0 1px 0 rgba(255,255,255,.45); }
+  button.rec { background: var(--rec); color: #fff; border-color: var(--rec); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .65; } }
+  select, input[type=text], input[type=password], input[type=url] { padding: 7px 10px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 20px; padding: 16px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { border-radius: 26px; padding: 16px; }
+  #drop { border: 2px dashed var(--line); border-radius: 18px; padding: 40px 16px; text-align: center; color: var(--muted); cursor: pointer; background: var(--glass-flat); }
+  #drop.over { border-color: var(--accent); color: var(--accent); }
+  video { width: 100%; max-height: 62vh; background: #000; border-radius: 18px; display: block; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  #tc { font: 700 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  #timeline { position: relative; height: 18px; margin-top: 10px; background: var(--glass-flat); box-shadow: var(--inset); border-radius: 9px; cursor: pointer; }
+  #timeline .pin { position: absolute; top: 3px; width: 4px; height: 12px; background: var(--accent); border-radius: 2px; transform: translateX(-2px); }
+  #timeline .pin.done { background: var(--good); }
+  #timeline .head { position: absolute; top: 0; width: 2px; height: 18px; background: var(--rec); }
+  #editor { margin-top: 14px; display: none; border-radius: 20px; background: var(--glass-flat); }
+  #editor.open { display: block; }
+  #editor .row { display: flex; gap: 10px; align-items: flex-start; }
+  #editor img { width: 160px; border-radius: 12px; flex: none; background: #000; }
+  #editor img[src=""], .note img[src=""] { visibility: hidden; }
+  .note.general { border-style: dashed; }
+  #editor textarea { width: 100%; min-height: 96px; padding: 10px 12px; resize: vertical; margin-top: 6px; }
+  #recStatus { min-height: 1.5em; }
+  #list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 140px); overflow: auto; }
+  .note { display: grid; grid-template-columns: 104px 1fr; gap: 10px; padding: 10px 12px; border-radius: 18px;
+    background: var(--glass-flat); border: 1px solid var(--glass-border); box-shadow: var(--shadow-soft); }
+  .note.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-soft); }
+  .note.done .text { text-decoration: line-through; color: var(--muted); }
+  .note img { width: 104px; border-radius: 10px; cursor: pointer; background: #000; }
+  .note .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .note .tcbtn { font-family: ui-monospace, Menlo, monospace; font-weight: 700; padding: 3px 8px; font-variant-numeric: tabular-nums; }
+
+  .note .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; outline: none; border-radius: 4px; }
+  .note .text:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .note .actions { display: flex; gap: 6px; margin-top: 4px; }
+  .note .actions button { padding: 3px 10px; font-size: 12px; box-shadow: none; }
+  dialog { border-radius: 24px; background: var(--sheet-bg); color: var(--ink); width: min(560px, calc(100vw - 32px)); padding: 20px; }
+  dialog::backdrop { background: rgba(40,36,80,.28); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  dialog label { display: block; margin: 10px 0 4px; font-weight: 600; }
+  dialog input, dialog select, dialog textarea { width: 100%; }
+  dialog textarea { min-height: 90px; padding: 6px 8px; }
+  kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 4px; opacity: .8; }
+  .menu { position: relative; }
+  .menu summary { list-style: none; }
+  .menu summary::-webkit-details-marker { display: none; }
+  .btn { display: inline-flex; align-items: center; padding: 7px 12px; border: 1px solid var(--glass-border); border-radius: 12px; cursor: pointer; user-select: none; }
+  .menu-list { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; gap: 2px;
+    background: var(--sheet-bg); border-radius: 18px; padding: 8px; min-width: 270px; }
+  .menu-list button { text-align: left; border-color: transparent; background: transparent; box-shadow: none; border-radius: 10px; }
+  .transport { width: fit-content; }
+  .transport button { min-width: 48px; }
+  #loader .bar input { padding: 8px; }
+  #otherSrc > summary { cursor: pointer; padding: 6px 2px; list-style: none; }
+  #otherSrc > summary::-webkit-details-marker { display: none; }
+  body:not(.server) #otherSrc > summary { display: none; }
+  body.server #otherSrc[open] > summary { margin-bottom: 8px; }
+  #drive { margin-bottom: 12px; }
+  #driveList { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 55vh; overflow: auto; }
+  .dItem { display: grid; grid-template-columns: 88px 1fr; gap: 12px; align-items: center; text-align: left; padding: 10px 12px; width: 100%;
+    border-radius: 18px; background: var(--glass-flat); white-space: normal; }
+  .dItem .th { width: 88px; aspect-ratio: 16/9; border-radius: 10px; object-fit: cover; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); opacity: .85; }
+  .dItem .th svg { color: #fff; width: 20px; height: 20px; }
+  .dItem .nm { font-weight: 600; word-break: break-all; }
+  .dItem .sub { font-size: 12px; color: var(--muted); }
+  #printView { display: none; }
+  /* point marker on the frame */
+  #stage { position: relative; }
+  #stageHit { position: absolute; inset: 0 0 52px 0; display: none; cursor: crosshair; }
+  body.editing.timed #stageHit { display: block; }
+  .pt { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 3px solid #ef4444; border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.85); pointer-events: none; }
+  /* status, chips, alerts, toast */
+  .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); color: var(--accent); border-radius: 999px;
+    padding: 2px 9px; font-size: 11.5px; white-space: nowrap; }
+  .st-changes { background: rgba(250,178,25,.18); color: var(--warning); }
+  .st-approved { background: rgba(12,163,12,.12); color: var(--good); }
+  .fresh { background: rgba(208,59,59,.12); color: var(--rec); }
+  #statusBar { margin: 0 0 12px; padding: 10px 12px; border-radius: 18px; background: var(--glass-flat); border: 1px solid var(--glass-border); }
+  #statusBar button.on { box-shadow: 0 0 0 2px var(--accent); }
+  #alertBar { display: flex; flex-direction: column; gap: 6px; padding: 10px 16px; margin: 10px 16px 0; border-radius: 18px;
+    background: rgba(250,178,25,.2); color: var(--ink); border: 1px solid var(--glass-border); }
+  #alertBar[hidden] { display: none; }
+  #alertBar .row { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  #alertBar .alert { display: grid; grid-template-columns: 18px 1fr auto; gap: 2px 8px; align-items: center; }
+  #alertBar .alert .ic { color: var(--warning); }
+  #alertBar .alert time { grid-column: 2; font-size: 11px; color: var(--muted); }
+  #alertBar .alert button { grid-row: span 2; }
+  #toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 50;
+    background: rgba(29,27,46,.88); color: #fff; padding: 10px 16px; border-radius: 14px; font-size: 13px; max-width: calc(100vw - 32px); display: none;
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: var(--shadow-soft); }
+  #toast.show { display: block; }
+  /* guest gate, tour, share dialog */
+  #gate { max-width: 420px; margin: 12vh auto; text-align: center; }
+  #gate input { font-size: 24px; letter-spacing: 8px; text-align: center; width: 200px; padding: 8px; }
+  .tour-step { text-align: center; padding: 8px 4px; }
+  .tour-step h3 { margin: 8px 0; }
+  .dots { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
+  .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  .dots i.on { background: var(--accent); }
+  .shareRow { border: 1px solid var(--glass-border); background: var(--glass-flat); border-radius: 16px; padding: 10px 12px; margin-top: 8px; color: var(--ink-2); }
+  #shareMsg { width: 100%; min-height: 110px; }
+  body.guest .ownerOnly, body:not(.server) .serverOnly, body.server .localOnly, body:not(.owner) .ownerSrv { display: none !important; }
+  /* ---------- phone ---------- */
+  @media (max-width: 700px) {
+    header { margin: 8px 8px 0; padding: 8px 12px; top: max(4px, env(safe-area-inset-top)); }
+    header h1 .tagline, #who, header .lbl, .kbdhint { display: none; }
+    header { flex-wrap: nowrap; }
+    header button, header .btn { padding: 6px 10px; }
+    /* backdrop-filter would make the fixed action bar stick to this panel instead of the screen */
+    #playerPanel { -webkit-backdrop-filter: none; backdrop-filter: none; }
+    main { padding: 8px; gap: 8px; }
+    .panel { padding: 12px; border-radius: 22px; }
+    #drop { padding: 32px 12px; }
+    video { max-height: 45vh; }
+    #list { max-height: none; overflow: visible; }
+    #editor .row { flex-direction: column; }
+    #editor img { width: 50%; }
+    #addBar { position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 10; margin: 0; padding: 8px;
+      border-radius: 22px; display: grid; grid-template-columns: 1.4fr 1fr 1fr;
+      background: var(--sheet-bg); -webkit-backdrop-filter: blur(30px) saturate(190%); backdrop-filter: blur(30px) saturate(190%);
+      border: 1px solid var(--glass-border); box-shadow: var(--shadow); }
+    body { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+    body.editing #addBar { display: none; }
+    .transport { width: 100%; display: grid; grid-template-columns: repeat(7, 1fr); }
+    .transport button { min-width: 0; padding: 6px 2px; font-size: 12px; }
+    .transport [data-step=prev], .transport [data-step=next] { font-size: 0; gap: 0; }
+    .menu-list { position: fixed; left: 12px; right: 12px; top: auto; }
+  }
+  @media (pointer: coarse) {
+    button, .btn, select { min-height: 44px; }
+    .note .actions button, .note .tcbtn { min-height: 36px; }
+    textarea, input, select { font-size: 16px !important; } /* stops iOS zooming on focus */
+    kbd, .kbdhint { display: none; }
+    #timeline { height: 28px; }
+    #timeline .pin { height: 24px; width: 5px; }
+    #timeline .head { height: 28px; }
+  }
+  @media print {
+    body > *:not(#printView) { display: none !important; }
+    #printView { display: block; color: #000; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><img class="brand-mark" src="icons/icon.svg" alt="">片語 <span class="small muted tagline" style="font-weight:450">Clipnote・暫停，說一句，修改就對齊。</span></h1>
+  <span id="who" class="small muted"></span>
+  <span class="spacer"></span>
+  <button id="btnTheme" class="iconBtn" title="切換亮色／暗色" aria-label="切換亮色／暗色"></button>
+  <button id="btnHelp" class="iconBtn" title="使用教學" aria-label="使用教學"><i data-ic="help"></i></button>
+  <details class="menu" id="exportMenu">
+    <summary class="btn primary"><i data-ic="download"></i><span>匯出</span><i data-ic="chevron"></i></summary>
+    <div class="menu-list">
+      <button id="btnDocx" title="含時間碼截圖與文字的 Word 文件"><i data-ic="doc"></i>文件（Word，含截圖）</button>
+      <button id="btnReport" title="含截圖的網頁報告，可直接另存 PDF"><i data-ic="image"></i>文件（HTML，含截圖）</button>
+      <button id="btnPrint"><i data-ic="print"></i>列印 / 存成 PDF</button>
+      <button id="btnCopy" title="Tab 分隔，可直接貼到 Excel / Google 試算表"><i data-ic="table"></i>複製表格（貼到 Excel）</button>
+      <button id="btnCsv"><i data-ic="table"></i>CSV 表格</button>
+      <button id="btnXml" title="Premiere / FCP7 XML，時間碼變成序列標記"><i data-ic="flag"></i>Premiere 標記（XML）</button>
+      <button id="btnSrt"><i data-ic="subtitle"></i>SRT 字幕（疊在影片上看）</button>
+      <button id="btnJson"><i data-ic="code"></i>JSON（給別人合併 / 換電腦）</button>
+      <button id="btnImport" class="ownerOnly" title="載入其他人的 JSON 意見合併"><i data-ic="upload"></i>匯入別人的意見（JSON）</button>
+    </div>
+  </details>
+  <button id="btnSettings" class="ownerOnly" aria-label="設定"><i data-ic="settings"></i><span class="lbl">設定</span></button>
+  <input id="importFile" type="file" accept=".json,application/json" hidden>
+</header>
+<div id="alertBar" hidden></div>
+<section id="gate" class="panel" hidden></section>
+
+<main>
+  <section class="panel" id="playerPanel">
+    <div id="loader">
+      <div id="drive" hidden>
+        <div class="bar" style="margin-top:0">
+          <strong class="iconLabel"><i data-ic="folder"></i>影片資料夾</strong>
+          <span id="drivePath" class="small muted" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></span>
+          <button id="driveRefresh" class="small iconBtn" title="重新整理" aria-label="重新整理"><i data-ic="refresh"></i></button>
+        </div>
+        <div id="driveList"></div>
+      </div>
+      <details id="otherSrc" open>
+      <summary class="small muted">其他影片來源：本機檔案、連結</summary>
+      <div id="drop"><strong>點這裡選影片</strong>，或把影片拖進來<br>
+        <span class="small">手機可以從相簿、檔案 App 選，或直接拍攝。影片只在你的裝置上播放，不會上傳。</span></div>
+      <form id="urlForm" class="bar">
+        <input id="videoUrl" type="url" placeholder="或貼上影片連結（Dropbox、NAS、直連 mp4…）" style="flex:1; min-width:0">
+        <button class="primary">載入</button>
+      </form>
+      </details>
+      <div id="urlHint" class="small muted"></div>
+    </div>
+    <input id="videoFile" type="file" accept="video/*" hidden>
+    <div id="playerWrap" hidden>
+      <div id="stage">
+        <video id="video" controls playsinline></video>
+        <div id="stageHit" title="點一下標出位置"></div>
+        <div id="pt" class="pt" hidden></div>
+      </div>
+      <div id="timeline" title="點擊跳轉"><div class="head" id="head"></div></div>
+      <div class="bar">
+        <span id="tc">00:00:00:00</span>
+        <button id="fpsBadge" class="small muted" title="更改 FPS / 起始時間碼" style="border:0;background:none;padding:0"></button>
+        <span class="spacer" style="flex:1"></span>
+        <span id="srcName" class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%"></span>
+        <button id="btnShare" class="small primary ownerSrv" hidden><i data-ic="link"></i>分享給外部審片</button>
+        <button id="btnChange" class="small ownerOnly">換影片</button>
+      </div>
+      <div id="srcHint" class="small" style="color:var(--rec)"></div>
+      <div class="bar transport seg">
+        <button data-step="-1s">−1秒</button>
+        <button data-step="-1f">−1格</button>
+        <button data-step="play" id="btnPlay" aria-label="播放／暫停"></button>
+        <button data-step="+1f">+1格</button>
+        <button data-step="+1s">+1秒</button>
+        <button data-step="prev" title="上一則意見"><i data-ic="prev"></i>意見</button>
+        <button data-step="next" title="下一則意見">意見<i data-ic="next"></i></button>
+      </div>
+      <div class="bar" id="addBar">
+        <button id="btnAddVoice" class="primary" title="快捷鍵 V"><i data-ic="mic"></i>語音意見</button>
+        <button id="btnAddText" title="快捷鍵 Enter"><i data-ic="pencil"></i>文字意見</button>
+        <button id="btnAddGeneral" title="不針對特定時間碼，針對整支影片的意見"><i data-ic="clipboard"></i>整體意見</button>
+      </div>
+      <div class="small muted kbdhint" style="margin-top:6px">
+        <kbd>Space</kbd> 播放/暫停　<kbd>←</kbd><kbd>→</kbd> 前後一格　<kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 前後一秒　<kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> 倒退/停/快轉　<kbd>[</kbd><kbd>]</kbd> 上/下一則意見
+      </div>
+
+      <div id="editor" class="panel">
+        <div class="row">
+          <img id="edThumb" alt="">
+          <div style="flex:1; min-width:0">
+            <div class="bar" style="margin-top:0">
+              <strong id="edTc" class="mono"></strong>
+              <select id="edCat" aria-label="類別"></select>
+              <label class="small toggle"><input type="checkbox" id="edGeneral"> 整體意見</label>
+            </div>
+            <div id="ptHint" class="small muted iconLabel"><i data-ic="target"></i>點一下畫面，可以標出你說的位置</div>
+            <textarea id="edText" placeholder="說出或輸入要修改的地方…"></textarea>
+            <div id="recStatus" class="small muted"></div>
+            <div class="bar edActions">
+              <button id="btnRec" class="ghost"><i data-ic="mic"></i>錄音</button>
+              <button id="btnPolish" class="ghost" title="用 Claude 把口語整理成具體的修改指示"><i data-ic="sparkle"></i>AI 潤飾</button>
+              <button id="btnRaw" class="ghost" hidden title="換回潤飾前的原始口述"><i data-ic="undo"></i>原始口述</button>
+              <span class="spacer" style="flex:1"></span>
+              <button id="btnCancel" class="ghost" title="Esc">取消</button>
+              <button id="btnSave" class="primary" title="Ctrl/⌘ + Enter">儲存</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div id="statusBar" class="bar serverOnly" hidden>
+      <span>審核狀態：<strong id="statusText"></strong></span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="seg">
+      <button data-status="approved"><i data-ic="checkCircle"></i>核准</button>
+      <button data-status="changes"><i data-ic="pencil"></i>需要修改</button>
+      <button data-status="review" class="ownerOnly"><i data-ic="undo"></i>改回待審</button>
+      </span>
+    </div>
+    <div class="bar" style="margin-top:0; margin-bottom:8px">
+      <strong>修改清單</strong><span id="count" class="muted small"></span>
+      <span class="spacer" style="flex:1"></span>
+      <label class="small"><input type="checkbox" id="hideDone"> 隱藏已完成</label>
+    </div>
+    <div id="list"><div class="muted small">還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。</div></div>
+  </section>
+</main>
+
+<dialog id="settings">
+  <form method="dialog">
+    <h3 style="margin-top:0">設定</h3>
+    <div class="bar" style="margin-top:0">
+      <label style="flex:1">FPS（這支影片）
+        <select id="fps">
+          <option>23.976</option><option>24</option><option>25</option><option selected>29.97</option>
+          <option>30</option><option>50</option><option>59.94</option><option>60</option>
+        </select>
+      </label>
+      <label style="flex:1">起始時間碼 <input id="startTc" type="text" value="00:00:00:00"></label>
+    </div>
+    <label>審片人（會寫進修改表）</label>
+    <input id="setReviewer" type="text" placeholder="例如：阿湯">
+    <label>語音辨識引擎</label>
+    <select id="setEngine">
+      <option value="elevenlabs">ElevenLabs Scribe v2（推薦：中英夾雜最準，可加專有名詞）</option>
+      <option value="openai" class="localOnly">OpenAI gpt-4o-transcribe</option>
+      <option value="browser">瀏覽器內建（免費、即時，Chrome / Edge；中英夾雜較弱）</option>
+    </select>
+    <div class="localOnly">
+      <label>ElevenLabs API Key</label>
+      <input id="setElKey" type="password" placeholder="xi-api-key" autocomplete="off">
+      <label>OpenAI API Key</label>
+      <input id="setOaKey" type="password" placeholder="sk-..." autocomplete="off">
+    </div>
+    <label>專有名詞 / 常講的英文（一行一個，提高辨識率）</label>
+    <textarea id="setTerms" placeholder="例如：&#10;Logo&#10;Super&#10;B-roll&#10;調光&#10;安達人壽"></textarea>
+    <div class="localOnly">
+      <label>AI 潤飾：Anthropic API Key</label>
+      <input id="setAnKey" type="password" placeholder="sk-ant-..." autocomplete="off">
+    </div>
+    <label>AI 潤飾模型</label>
+    <select id="setPolishModel">
+      <option value="claude-opus-5-5">Claude Opus 5.5（最仔細）</option>
+      <option value="claude-sonnet-5-5">Claude Sonnet 5.5（較快）</option>
+      <option value="claude-haiku-5-5">Claude Haiku 5.5（最快、最便宜）</option>
+    </select>
+    <label style="font-weight:400"><input type="checkbox" id="setAutoPolish" style="width:auto"> 語音辨識完自動潤飾</label>
+    <label style="font-weight:400"><input type="checkbox" id="setPolishImage" style="width:auto"> 潤飾時附上該時間點截圖，讓 AI 看畫面寫得更具體</label>
+    <div class="localOnly">
+      <label>Google Drive 影片資料夾網址</label>
+      <input id="setDriveFolder" type="url" placeholder="https://drive.google.com/drive/folders/..." autocomplete="off">
+      <label>Google API Key（讀取上面的資料夾用）</label>
+      <input id="setGKey" type="password" placeholder="AIza..." autocomplete="off">
+      <p class="small muted" style="margin:4px 0 0">資料夾要設成「知道連結的任何人都能檢視」。設定方式見 README。</p>
+    </div>
+    <label>修改類別（逗號分隔）</label>
+    <input id="setCats" type="text">
+    <p class="small muted localOnly">API Key 只存在這台電腦的瀏覽器裡，錄音會直接送到你選的辨識服務。</p>
+    <p class="small muted serverOnly">API Key 都存在伺服器上。專有名詞、類別、AI 設定會套用到你所有裝置和分享出去的連結。</p>
+    <div class="bar"><span class="spacer" style="flex:1"></span><button value="ok" class="primary">完成</button></div>
+  </form>
+</dialog>
+
+<dialog id="shareDlg">
+  <h3 style="margin-top:0" class="iconLabel"><i data-ic="link"></i>分享給外部審片</h3>
+  <div class="small muted" id="shareVideo"></div>
+  <form id="shareForm">
+    <label>對方的名字（會顯示在他的意見上）</label>
+    <input id="shLabel" type="text" placeholder="例如：王小姐（客戶）" required>
+    <div class="bar">
+      <label style="flex:1; margin:0">有效期限
+        <select id="shDays"><option value="3">3 天</option><option value="7">7 天</option><option value="14" selected>14 天</option><option value="30">30 天</option></select>
+      </label>
+    </div>
+    <label style="font-weight:400"><input type="checkbox" id="shLock" style="width:auto"> 只限第一台打開的裝置（轉傳給別人會打不開）</label>
+    <label style="font-weight:400"><input type="checkbox" id="shPin" style="width:auto"> 另外加 6 位數密碼（機密案子：連結和密碼分開傳）</label>
+    <div class="bar"><button class="primary">產生分享連結</button></div>
+  </form>
+  <div id="shareResult" hidden>
+    <label>複製這段訊息貼給對方（LINE、Email 都可以）</label>
+    <textarea id="shareMsg" readonly></textarea>
+    <div class="bar">
+      <button id="shCopy" class="primary"><i data-ic="copy"></i>複製訊息</button>
+      <button id="shSend"><i data-ic="share"></i>分享…</button>
+    </div>
+    <div id="sharePin" class="shareRow" hidden></div>
+  </div>
+  <h4 style="margin-bottom:4px">已分享</h4>
+  <div id="shareList" class="small muted">讀取中…</div>
+  <div class="bar"><span class="spacer" style="flex:1"></span><button id="shClose">關閉</button></div>
+</dialog>
+
+<dialog id="tour">
+  <div id="tourBody"></div>
+  <div class="dots" id="tourDots"></div>
+  <div class="bar">
+    <button id="tourSkip">略過</button>
+    <span class="spacer" style="flex:1"></span>
+    <button id="tourPrev">上一步</button>
+    <button id="tourNext" class="primary">下一步</button>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+<div id="printView"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const ICONS = {
+    mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
+    pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+    clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/>',
+    sparkle: '<path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    checkCircle: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
+    link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+    share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v13M7 8l5-5 5 5"/>',
+    download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+    upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
+    chevron: '<path d="M6 9l6 6 6-6"/>',
+    doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+    print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+    table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
+    flag: '<path d="M6 21V3"/><path d="M6 4h11l-2.5 4L17 12H6"/>',
+    subtitle: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 13h4M13 13h4M7 16h8"/>',
+    code: '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    refresh: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/>',
+    play: '<path d="M7 4.5v15l12-7.5z"/>',
+    pause: '<path d="M8 5v14M16 5v14"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+    prev: '<path d="M18 5l-9 7 9 7z"/><path d="M6 5v14"/>',
+    next: '<path d="M6 5l9 7-9 7z"/><path d="M18 5v14"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>',
+    moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+    film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
+    playCircle: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/>',
+  };
+  const ic = name => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+  document.querySelectorAll('i[data-ic]').forEach(el => { el.outerHTML = ic(el.dataset.ic); });
+  const video = $('#video');
+  const FPS = { '23.976': [24000/1001, 24, true], '24': [24, 24, false], '25': [25, 25, false],
+    '29.97': [30000/1001, 30, true], '30': [30, 30, false], '50': [50, 50, false],
+    '59.94': [60000/1001, 60, true], '60': [60, 60, false] };
+  const DEFAULT_CATS = '剪接,字幕,字卡/圖像,調色,音效/音樂,旁白,畫面/特效,其他';
+
+  // ---------- storage (always guarded) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  const settings = Object.assign({ reviewer: '', engine: 'elevenlabs', elKey: '', oaKey: '', terms: '', cats: DEFAULT_CATS,
+    anKey: '', polishModel: 'claude-opus-5-5', autoPolish: true, polishImage: true, driveFolder: '', gKey: '' },
+    store.get('vrn.settings', {}));
+
+  let videoName = '', videoKey = '', notes = [], editing = null, activeId = null;
+
+  // ---------- backend: 'local' (keys in this browser), 'owner' (signed in via Cloudflare) or 'guest' (share link) ----------
+  const api = {
+    mode: 'local', token: '', pin: '', limit: 50,
+    async req(path, opts = {}) {
+      const headers = { ...(opts.headers || {}) };
+      if (this.mode === 'guest') { headers['x-share-token'] = this.token; if (this.pin) headers['x-share-pin'] = this.pin; }
+      if (opts.json !== undefined) { headers['content-type'] = 'application/json'; opts = { ...opts, body: JSON.stringify(opts.json) }; }
+      const r = await fetch((this.mode === 'guest' ? '/s/api' : '/api') + path, { ...opts, headers, credentials: 'same-origin' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw Object.assign(new Error(j.error || `連線錯誤（${r.status}）`), { status: r.status, data: j });
+      return j;
+    },
+    media(id) { return this.mode === 'guest' ? `/s/api/media?t=${encodeURIComponent(this.token)}` : `/api/videos/${encodeURIComponent(id)}/media`; },
+  };
+  const server = () => api.mode !== 'local';
+  // project.remote: the Drive file id when this video's notes live on the server
+  let project = { remote: null, info: null };
+  const notesPath = () => api.mode === 'guest' ? '/notes' : `/videos/${encodeURIComponent(project.remote)}/notes`;
+  function persist(n) {
+    if (!project.remote) return save();
+    const { isNew, author, ...data } = n;
+    api.req(`${notesPath()}/${encodeURIComponent(n.id)}`, { method: 'PUT', json: data }).catch(err => toast('意見沒有存到雲端：' + err.message));
+  }
+  function unpersist(n) {
+    if (!project.remote) return save();
+    api.req(`${notesPath()}/${encodeURIComponent(n.id)}`, { method: 'DELETE' }).catch(err => toast('刪除失敗：' + err.message));
+  }
+  let toastTimer;
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  // ---------- timecode ----------
+  const fpsInfo = () => FPS[$('#fps').value];
+  const frameOf = t => Math.floor(t * fpsInfo()[0] + 1e-4);
+  function offsetFrames() {
+    const tb = fpsInfo()[1], m = $('#startTc').value.match(/^(\d+):(\d+):(\d+)[:;](\d+)$/);
+    return m ? ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * tb + +m[4] : 0;
+  }
+  function tcOfFrame(f) {
+    const tb = fpsInfo()[1]; f += offsetFrames();
+    const p = n => String(n).padStart(2, '0');
+    return `${p(Math.floor(f / (tb * 3600)))}:${p(Math.floor(f / (tb * 60)) % 60)}:${p(Math.floor(f / tb) % 60)}:${p(f % tb)}`;
+  }
+  const tcOf = t => tcOfFrame(frameOf(t));
+  function srtTime(t) {
+    const ms = Math.round(t * 1000), p = (n, w = 2) => String(n).padStart(w, '0');
+    return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+  }
+  // seek to the middle of a frame so the decoder lands on the right one
+  const seekFrame = f => { video.currentTime = Math.max(0, (f + 0.5) / fpsInfo()[0]); };
+
+  // ---------- Simplified → Traditional (Taiwan) ----------
+  let toTW = null;
+  function loadOpenCC() {
+    if (toTW || window.__occLoading) return;
+    window.__occLoading = true;
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/cn2t.js';
+    s.onload = () => { try { toTW = OpenCC.Converter({ from: 'cn', to: 'twp' }); } catch {} };
+    document.head.appendChild(s);
+  }
+  loadOpenCC();
+  const tw = s => (toTW ? toTW(s) : s);
+
+  // ---------- video loading ----------
+  $('#drop').onclick = () => $('#videoFile').click();
+  $('#videoFile').onchange = e => e.target.files[0] && loadVideo(e.target.files[0]);
+  for (const ev of ['dragover', 'dragenter']) document.addEventListener(ev, e => { e.preventDefault(); $('#drop').classList.add('over'); });
+  document.addEventListener('dragleave', () => $('#drop').classList.remove('over'));
+  document.addEventListener('drop', e => {
+    e.preventDefault(); $('#drop').classList.remove('over');
+    const f = [...e.dataTransfer.files].find(f => f.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name));
+    if (f) loadVideo(f);
+  });
+  function loadVideo(file) {
+    video.removeAttribute('crossorigin'); $('#srcHint').textContent = '';
+    video.src = URL.createObjectURL(file);
+    openProject(file.name, `vrn.notes.${file.name}.${file.size}`);
+  }
+  // Share links -> direct media links. Dropbox streams well (supports range requests);
+  // Google Drive only works for small files and never allows screenshots (no CORS).
+  function directUrl(u) {
+    try {
+      const url = new URL(u.trim());
+      if (/(^|\.)dropbox\.com$/.test(url.hostname)) { url.searchParams.delete('dl'); url.searchParams.set('raw', '1'); return url.href; }
+      const m = url.hostname === 'drive.google.com' && (url.pathname.match(/\/d\/([^/]+)/) || [, url.searchParams.get('id')]);
+      // with an API key, stream through the Drive API: no 100 MB limit, seekable, screenshots allowed
+      if (m && m[1]) return settings.gKey ? driveMediaUrl(m[1]) : `https://drive.google.com/uc?export=download&id=${m[1]}`;
+      return url.href;
+    } catch { return ''; }
+  }
+  function loadUrl(raw, name, key) {
+    const src = directUrl(raw);
+    if (!src) { $('#urlHint').textContent = '這不是有效的網址'; return; }
+    $('#urlHint').textContent = '載入中…';
+    let triedCors = false;
+    const ok = () => { cleanup(); $('#urlHint').textContent = ''; };
+    $('#srcHint').textContent = '';
+    const fail = () => {
+      if (!triedCors) { // server doesn't allow CORS: play anyway, but screenshots are blocked by the browser
+        triedCors = true; video.removeAttribute('crossorigin'); video.src = src;
+        status2('這個連結的伺服器不允許擷取畫面，可以播放和記錄，但不會有截圖。建議改用 Dropbox 連結或先下載到手機。');
+        return;
+      }
+      cleanup(); $('#urlHint').textContent = '影片載入失敗：連結需要能直接播放（Dropbox 分享連結、或 .mp4 直連）；Google Drive 請在設定填 API Key，並把檔案設成「知道連結的任何人都能檢視」。也可能是瀏覽器不支援這個影片格式（請用 H.264 mp4）。';
+      $('#loader').hidden = false; $('#playerWrap').hidden = true;
+    };
+    const cleanup = () => { video.removeEventListener('loadeddata', ok); video.removeEventListener('error', fail); };
+    video.addEventListener('loadeddata', ok); video.addEventListener('error', fail);
+    video.crossOrigin = 'anonymous'; video.src = src;
+    const u = new URL(src);
+    name ||= decodeURIComponent(u.pathname.split('/').pop() || '') || u.hostname;
+    u.searchParams.delete('key'); // never part of the storage key
+    openProject(name, key || 'vrn.notes.url.' + u.href.replace(/[?&](raw|dl)=\d/g, ''));
+  }
+  const status2 = t => { $('#srcHint').textContent = t; };
+
+  // ---------- Google Drive folder (public link + API key) ----------
+  const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
+  const driveMediaUrl = id => `${DRIVE_API}/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true&key=${encodeURIComponent(settings.gKey)}`;
+  function driveFolderId() {
+    const v = settings.driveFolder;
+    if (!v) return '';
+    const m = v.match(/\/folders\/([\w-]+)/) || v.match(/[?&]id=([\w-]+)/);
+    return m ? m[1] : (/^[\w-]{10,}$/.test(v) ? v : '');
+  }
+  function fmtDur(ms) {
+    if (!ms) return '';
+    const t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = String(t % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+  }
+  const fmtSize = b => !b ? '' : b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : Math.round(b / 1e6) + ' MB';
+  const STATUS = { review: '待審', changes: '需要修改', approved: '已核准' };
+  const statusChip = st => `<span class="chip st-${st || 'review'}">${STATUS[st] || STATUS.review}</span>`;
+  async function listServerVideos() {
+    const list = $('#driveList');
+    $('#drive').hidden = false; $('#drivePath').textContent = '最新的在最上面';
+    list.innerHTML = '<div class="small muted">讀取中…</div>';
+    try {
+      const { files } = await api.req('/videos');
+      list.innerHTML = files.length ? files.map(f => `<button class="dItem" data-remote="${esc(f.id)}" data-name="${esc(f.name)}">
+          <div class="th">${ic('play')}</div>
+          <span><span class="nm">${esc(f.name)}</span><br><span class="sub">${[fmtDur(f.videoMediaMetadata?.durationMillis),
+            f.videoMediaMetadata?.height ? f.videoMediaMetadata.height + 'p' : '', fmtSize(+f.size),
+            new Date(f.modifiedTime).toLocaleDateString('zh-TW')].filter(Boolean).join(' · ')}</span><br>
+            ${statusChip(f.status)} ${f.notes ? `<span class="chip">${f.notes} 則意見</span>` : ''} ${f.fresh ? `<span class="chip fresh">${f.fresh} 則新意見</span>` : ''}</span>
+        </button>`).join('') : '<div class="small muted">資料夾裡還沒有影片。把輸出好的影片放進 Google Drive 資料夾，就會出現在這裡。</div>';
+    } catch (err) {
+      list.innerHTML = `<div class="small" style="color:var(--rec)">讀不到影片資料夾：${esc(err.message)}</div>`;
+    }
+  }
+  async function openRemote(id, name) {
+    $('#urlHint').textContent = '載入中…';
+    try {
+      const j = await api.req(`/videos/${encodeURIComponent(id)}`);
+      video.removeAttribute('crossorigin'); $('#srcHint').textContent = '';
+      video.src = api.media(id);
+      openProject(j.name || name, null, { id, info: j.info, notes: j.notes });
+      $('#urlHint').textContent = '';
+    } catch (err) { $('#urlHint').textContent = '打不開這支影片：' + err.message; }
+  }
+  video.addEventListener('error', () => { if (project.remote) status2('影片載入失敗：請確認是瀏覽器能播放的格式（H.264 mp4），或重新整理再試一次。'); });
+  async function listDrive() {
+    if (api.mode === 'owner') return listServerVideos();
+    // only the one configured folder: its videos, newest first (subfolders are ignored)
+    const folder = driveFolderId(), box = $('#drive');
+    box.hidden = !(folder && settings.gKey);
+    if (box.hidden) return;
+    $('#drivePath').textContent = '最新的在最上面';
+    const list = $('#driveList');
+    list.innerHTML = '<div class="small muted">讀取中…</div>';
+    const q = `'${folder}' in parents and trashed = false and mimeType contains 'video/'`;
+    const params = new URLSearchParams({ q, key: settings.gKey, pageSize: '200', orderBy: 'modifiedTime desc',
+      supportsAllDrives: 'true', includeItemsFromAllDrives: 'true',
+      fields: 'files(id,name,mimeType,size,modifiedTime,thumbnailLink,videoMediaMetadata(durationMillis,width,height))' });
+    try {
+      const r = await fetch(`${DRIVE_API}?${params}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(driveError(j));
+      const items = j.files || [];
+      list.innerHTML = items.length ? items.map(f => `<button class="dItem" data-file="${esc(f.id)}" data-name="${esc(f.name)}">
+            ${f.thumbnailLink ? `<img class="th" src="${esc(f.thumbnailLink)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'th'}))">` : `<div class="th">${ic('play')}</div>`}
+            <span><span class="nm">${esc(f.name)}</span><br><span class="sub">${[fmtDur(f.videoMediaMetadata?.durationMillis),
+              f.videoMediaMetadata?.height ? f.videoMediaMetadata.height + 'p' : '', fmtSize(+f.size),
+              new Date(f.modifiedTime).toLocaleDateString('zh-TW')].filter(Boolean).join(' · ')}</span></span>
+          </button>`).join('') : '<div class="small muted">這個資料夾裡還沒有影片。</div>';
+    } catch (err) {
+      list.innerHTML = `<div class="small" style="color:var(--rec)">讀不到 Google Drive 資料夾：${esc(err.message)}</div>`;
+    }
+  }
+  function driveError(j) {
+    const e = j.error || {}, reason = e.errors?.[0]?.reason || e.status || '';
+    if (e.code === 404 || reason === 'notFound') return '找不到資料夾。請確認網址正確，而且資料夾已設成「知道連結的任何人都能檢視」。';
+    if (/API_KEY|keyInvalid|badRequest/i.test(reason + e.message) && e.code === 400) return 'API Key 無效，請檢查是否貼對。';
+    if (/referer|blocked/i.test(e.message || '')) return '這把 API Key 不允許從目前這個網址使用（請檢查 API Key 的網站限制）。';
+    if (/accessNotConfigured|SERVICE_DISABLED/i.test(reason + e.message)) return 'Google Drive API 還沒啟用，請到 Google Cloud 啟用。';
+    return e.message || JSON.stringify(j);
+  }
+  $('#driveList').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.remote) openRemote(b.dataset.remote, b.dataset.name);
+    if (b.dataset.file) loadUrl(driveMediaUrl(b.dataset.file), b.dataset.name, 'vrn.notes.gdrive.' + b.dataset.file);
+  });
+  $('#driveRefresh').onclick = listDrive;
+  function openProject(name, key, remote) {
+    videoName = name; videoKey = key || '';
+    project = { remote: remote?.id || null, info: remote?.info || null };
+    const saved = remote ? { notes: remote.notes, fps: remote.info?.fps, startTc: remote.info?.startTc } : store.get(videoKey, null);
+    notes = saved?.notes || [];
+    if (saved?.fps) $('#fps').value = saved.fps;
+    if (saved?.startTc) $('#startTc').value = saved.startTc;
+    $('#loader').hidden = true; $('#playerWrap').hidden = false;
+    $('#srcName').textContent = name;
+    $('#fpsBadge').textContent = $('#fps').value + 'fps';
+    document.title = `${videoName} – 片語`;
+    $('#btnShare').hidden = !(api.mode === 'owner' && project.remote);
+    notes.sort(byTime); activeId = null;
+    render(); renderStatus();
+  }
+  $('#urlForm').onsubmit = e => { e.preventDefault(); if ($('#videoUrl').value.trim()) loadUrl($('#videoUrl').value); };
+  $('#btnChange').onclick = () => {
+    video.pause(); closeEditor();
+    $('#loader').hidden = false; $('#playerWrap').hidden = true; $('#urlHint').textContent = '';
+    project = { remote: null, info: null }; notes = []; videoKey = '';
+    render(); renderStatus(); listDrive();
+  };
+  $('#fpsBadge').onclick = () => openSettings();
+  const save = () => !project.remote && videoKey && store.set(videoKey, { notes, fps: $('#fps').value, startTc: $('#startTc').value });
+  $('#fps').onchange = $('#startTc').onchange = () => {
+    if (project.remote && api.mode === 'owner')
+      api.req(`/videos/${encodeURIComponent(project.remote)}`, { method: 'PATCH', json: { fps: $('#fps').value, startTc: $('#startTc').value } }).catch(err => toast(err.message));
+    save(); render(); updateTc(); $('#fpsBadge').textContent = $('#fps').value + 'fps';
+  };
+
+  // ---------- touch transport ----------
+  document.querySelector('.transport').addEventListener('click', e => {
+    const k = e.target.closest('button')?.dataset.step;
+    if (!k || !video.src) return;
+    const step = 1 / fpsInfo()[0];
+    if (k === 'play') { video.paused ? video.play() : video.pause(); return; }
+    if (k === 'prev' || k === 'next') { jumpNote(k === 'next' ? 1 : -1); return; }
+    video.pause();
+    const d = { '-1s': -1, '+1s': 1, '-1f': -step, '+1f': step }[k];
+    video.currentTime = Math.min(video.duration || Infinity, Math.max(0, video.currentTime + d));
+  });
+  const playIcon = () => { $('#btnPlay').innerHTML = ic(video.paused ? 'play' : 'pause'); };
+  playIcon();
+  video.addEventListener('play', playIcon); video.addEventListener('pause', playIcon);
+  function jumpNote(dir) {
+    const f = frameOf(video.currentTime), timed = notes.filter(n => !n.general);
+    const n = dir > 0 ? timed.find(n => n.frame > f) : [...timed].reverse().find(n => n.frame < f);
+    if (n) { video.pause(); activeId = n.id; seekFrame(n.frame); render(); refreshPt(); }
+  }
+
+  // ---------- playhead ----------
+  function updateTc() {
+    $('#tc').textContent = tcOf(video.currentTime);
+    if (video.duration) $('#head').style.left = (video.currentTime / video.duration * 100) + '%';
+  }
+  video.addEventListener('timeupdate', updateTc);
+  video.addEventListener('seeked', updateTc);
+  video.addEventListener('loadedmetadata', () => { render(); updateTc(); });
+  (function tick() { if (!video.paused) updateTc(); requestAnimationFrame(tick); })();
+  $('#timeline').onclick = e => {
+    if (!video.duration || e.target.classList.contains('pin')) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    video.currentTime = (e.clientX - r.left) / r.width * video.duration;
+  };
+
+  // ---------- point marker: tap the frame to show where you mean ----------
+  function contentRect() { // the picture inside the <video> box (letterboxing excluded), relative to #stage
+    const r = video.getBoundingClientRect(), sr = $('#stage').getBoundingClientRect();
+    const vw = video.videoWidth || 16, vh = video.videoHeight || 9, k = Math.min(r.width / vw, r.height / vh);
+    return { x: r.left - sr.left + (r.width - vw * k) / 2, y: r.top - sr.top + (r.height - vh * k) / 2, w: vw * k, h: vh * k };
+  }
+  function showPt(pt) {
+    const el = $('#pt');
+    if (!pt) { el.hidden = true; return; }
+    const c = contentRect();
+    el.style.left = c.x + pt.x * c.w + 'px'; el.style.top = c.y + pt.y * c.h + 'px'; el.hidden = false;
+  }
+  function refreshPt() {
+    const n = editing ? ($('#edGeneral').checked ? null : editing) : notes.find(x => x.id === activeId);
+    showPt(n && !n.general && n.pt && video.paused && frameOf(video.currentTime) === (n.frame ?? frameOf(video.currentTime)) ? n.pt : null);
+  }
+  function drawPt(ctx, w, h, pt) {
+    if (!pt) return;
+    const r = Math.max(10, w * 0.035), x = pt.x * w, y = pt.y * h;
+    ctx.lineWidth = Math.max(3, r * 0.22);
+    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(x, y, r + ctx.lineWidth * 0.8, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  $('#stageHit').onclick = e => {
+    if (!editing || $('#edGeneral').checked) return;
+    const c = contentRect(), sr = $('#stage').getBoundingClientRect();
+    const x = (e.clientX - sr.left - c.x) / c.w, y = (e.clientY - sr.top - c.y) / c.h;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    editing.pt = { x: +x.toFixed(4), y: +y.toFixed(4) };
+    editing.thumb = grabThumb(editing.pt);
+    $('#edThumb').src = editing.thumb;
+    refreshPt();
+  };
+  video.addEventListener('play', () => showPt(null));
+  video.addEventListener('seeked', refreshPt);
+  window.addEventListener('resize', refreshPt);
+
+  function grabThumb(pt) {
+    if (!video.videoWidth) return '';
+    const c = document.createElement('canvas'), w = 320;
+    c.width = w; c.height = Math.round(w * video.videoHeight / video.videoWidth);
+    c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+    drawPt(c.getContext('2d'), c.width, c.height, pt);
+    try { return c.toDataURL('image/jpeg', 0.7); } catch { return ''; }
+  }
+
+  // ---------- editor ----------
+  const cats = () => settings.cats.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  // a general note (整體意見) has no timecode: t / frame are null
+  const label = n => n.general ? '整體意見' : tcOfFrame(n.frame);
+  const byTime = (a, b) => (a.general ? -1 : a.frame) - (b.general ? -1 : b.frame);
+  function openEditor(note, general = false) {
+    video.pause();
+    editing = note || { id: crypto.randomUUID?.() || String(Date.now()), t: video.currentTime, frame: frameOf(video.currentTime),
+      text: '', cat: cats()[0] || '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
+    $('#edCat').innerHTML = cats().map(c => `<option${c === editing.cat ? ' selected' : ''}>${esc(c)}</option>`).join('');
+    $('#edGeneral').checked = general || !!editing.general;
+    syncGeneral();
+    $('#edText').value = editing.text;
+    $('#recStatus').textContent = '';
+    $('#btnRaw').hidden = !editing.raw;
+    $('#editor').classList.add('open');
+    document.body.classList.add('editing');
+    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => $('#editor').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+  function syncGeneral() {
+    const g = $('#edGeneral').checked;
+    $('#edTc').textContent = g ? '整體意見（全片）' : tcOfFrame(editing.frame ?? frameOf(video.currentTime));
+    $('#edThumb').src = g ? '' : (editing.thumb || grabThumb(editing.pt));
+    $('#ptHint').hidden = g;
+    document.body.classList.toggle('timed', !g);
+    refreshPt();
+  }
+  $('#edGeneral').onchange = syncGeneral;
+  function closeEditor() {
+    if (rec.active) rec.stop(true);
+    editing = null; $('#editor').classList.remove('open'); document.body.classList.remove('editing', 'timed'); document.activeElement?.blur();
+    refreshPt();
+  }
+  function commit() {
+    if (!editing) return;
+    const text = $('#edText').value.trim();
+    if (!text) { closeEditor(); return; }
+    editing.text = text; editing.cat = $('#edCat').value;
+    if (editing.raw === text) delete editing.raw;
+    if ($('#edGeneral').checked) {
+      Object.assign(editing, { general: true, t: null, frame: null, thumb: '', pt: null });
+    } else if (editing.general || editing.frame == null) {
+      // a general note turned into a timed one takes the current playhead
+      Object.assign(editing, { general: false, t: video.currentTime, frame: frameOf(video.currentTime), thumb: grabThumb(editing.pt) });
+    }
+    if (editing.isNew) { delete editing.isNew; notes.push(editing); }
+    activeId = editing.id;
+    notes.sort(byTime);
+    persist(editing); closeEditor(); render();
+  }
+  $('#btnAddText').onclick = () => { openEditor(); $('#edText').focus(); };
+  $('#btnAddGeneral').onclick = () => { openEditor(null, true); $('#edText').focus(); };
+  $('#btnAddVoice').onclick = () => { openEditor(); rec.start(); };
+  $('#btnRec').onclick = () => rec.active ? rec.stop() : rec.start();
+  $('#btnSave').onclick = commit;
+  $('#btnCancel').onclick = closeEditor;
+
+  // ---------- speech ----------
+  const rec = {
+    active: false, mr: null, chunks: [], sr: null, base: '',
+    start() {
+      if (this.active) return;
+      const engine = settings.engine;
+      if (!server() && ((engine === 'elevenlabs' && !settings.elKey) || (engine === 'openai' && !settings.oaKey))) {
+        status('請先到「設定」填入 API Key，或改用瀏覽器內建辨識。'); openSettings(); return;
+      }
+      this.base = $('#edText').value ? $('#edText').value.replace(/\s*$/, '') + '\n' : '';
+      if (engine === 'browser') return this.startBrowser();
+      navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(stream => {
+        const type = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => window.MediaRecorder?.isTypeSupported?.(t)) || '';
+        this.mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+        this.chunks = [];
+        this.mr.ondataavailable = e => e.data.size && this.chunks.push(e.data);
+        this.mr.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          if (this.discard) return;
+          transcribe(new Blob(this.chunks, { type: this.mr.mimeType || 'audio/webm' }));
+        };
+        this.discard = false; this.mr.start(); this.active = true; recUi(true);
+        status('錄音中… 講完按「停止」或再按 V');
+      }).catch(err => status('無法使用麥克風：' + err.message));
+    },
+    startBrowser() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { status('這個瀏覽器不支援內建辨識，請用 Chrome / Edge，或改用 ElevenLabs / OpenAI。'); return; }
+      const sr = this.sr = new SR();
+      sr.lang = 'zh-TW'; sr.continuous = true; sr.interimResults = true;
+      let finalText = '';
+      sr.onresult = e => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
+        }
+        $('#edText').value = this.base + tw(finalText + interim);
+      };
+      sr.onerror = e => status('辨識錯誤：' + e.error);
+      sr.onend = () => { if (this.active) { this.active = false; recUi(false); status('辨識完成，可以直接修改文字再儲存。'); $('#edText').focus(); afterSpeech(); } };
+      sr.start(); this.active = true; recUi(true); status('聆聽中…（即時辨識）講完按「停止」或再按 V');
+    },
+    stop(discard = false) {
+      if (!this.active) return;
+      this.discard = discard;
+      if (this.sr) { this.sr.stop(); this.sr = null; if (discard) { this.active = false; recUi(false); } return; }
+      this.active = false; recUi(false);
+      this.mr?.state !== 'inactive' && this.mr.stop();
+    },
+  };
+  function recUi(on) {
+    $('#btnRec').innerHTML = on ? ic('stop') + '停止' : ic('mic') + '錄音';
+    $('#btnRec').classList.toggle('rec', on);
+  }
+  const status = s => { $('#recStatus').textContent = s; };
+  const terms = () => settings.terms.split('\n').map(s => s.trim()).filter(Boolean);
+
+  async function transcribe(blob) {
+    const target = editing; // the note being edited when recording started
+    status('辨識中…');
+    try {
+      let text;
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+      if (server()) {
+        const fd = new FormData();
+        fd.append('file', blob, `note.${ext}`);
+        text = (await api.req('/stt', { method: 'POST', body: fd })).text;
+      } else if (settings.engine === 'elevenlabs') {
+        const fd = new FormData();
+        fd.append('file', blob, `note.${ext}`);
+        fd.append('model_id', 'scribe_v2');
+        fd.append('language_code', 'zho');
+        fd.append('tag_audio_events', 'false');
+        terms().slice(0, 100).forEach(t => fd.append('keyterms', t));
+        const r = await fetch('https://api.elevenlabs.io/v1/speech-to-text', { method: 'POST', headers: { 'xi-api-key': settings.elKey }, body: fd });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail?.message || JSON.stringify(j.detail || j));
+        text = j.text;
+      } else {
+        const fd = new FormData();
+        fd.append('file', blob, `note.${ext}`);
+        fd.append('model', 'gpt-4o-transcribe');
+        fd.append('language', 'zh');
+        fd.append('prompt', '以下是台灣影片後製的修改意見，使用繁體中文，夾雜英文術語，英文請保留原文。'
+          + (terms().length ? '常用詞：' + terms().join('、') + '。' : ''));
+        const r = await fetch('https://api.openai.com/v1/audio/transcriptions', { method: 'POST', headers: { Authorization: 'Bearer ' + settings.oaKey }, body: fd });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error?.message || JSON.stringify(j));
+        text = j.text;
+      }
+      text = tw((text || '').trim());
+      if (editing !== target) return;
+      $('#edText').value = rec.base + text;
+      status('辨識完成，可以直接修改文字再儲存。');
+      $('#edText').focus();
+      afterSpeech();
+    } catch (err) {
+      status('辨識失敗：' + err.message);
+    }
+  }
+  const afterSpeech = () => { if (settings.autoPolish && (server() || settings.anKey) && $('#edText').value.trim()) polish(); };
+
+  // ---------- AI polish (Claude) ----------
+  const POLISH_SYSTEM = `你是台灣影片後製團隊的修改意見整理助手。使用者會給你審片人針對影片某個時間點（或整支影片）講的修改意見，通常是語音辨識結果，口語、有贅字、口頭禪、可能有辨識錯字，而且中英夾雜。
+
+請把它改寫成剪接師可以直接照著執行的修改指示：
+- 使用繁體中文（台灣用語）。英文術語、品牌名、專有名詞保留原文，例如 Logo、B-roll、Super、CTA、Fade in。
+- 去掉口頭禪、重複與語助詞，修正明顯的語音辨識錯字（可參考提供的常用詞）。
+- 寫清楚「改哪裡、改成什麼、怎麼改」。只有一件事就寫一兩句；有多件事就分點，每點以「1. 」「2. 」開頭。
+- 只根據原話整理，不要加入原話沒有的要求、數值或創意。原話不清楚、需要跟審片人確認的地方，在句末標註【待確認：要確認的內容】。
+- 如果附了截圖，只用來把原話裡「這裡、這個、那個字」對應到畫面上的具體元素（位置、顏色、文字內容），不要根據截圖自己提出新的修改。
+- 只輸出整理後的修改指示本身，不要前言、標題或說明。`;
+  let anthropic = null, lastPolished = null;
+  async function claudeClient() {
+    if (!anthropic || anthropic.__key !== settings.anKey) {
+      const { default: Anthropic } = await import('https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm');
+      anthropic = new Anthropic({ apiKey: settings.anKey, dangerouslyAllowBrowser: true });
+      anthropic.__key = settings.anKey;
+    }
+    return anthropic;
+  }
+  async function polish() {
+    if (!editing) return;
+    if (!server() && !settings.anKey) { status('請先到「設定」填入 Anthropic API Key 才能使用 AI 潤飾。'); openSettings(); return; }
+    const input = $('#edText').value.trim();
+    if (!input) { status('先輸入或講一段意見，再按潤飾。'); return; }
+    const target = editing;
+    // keep the very first spoken version as the raw text, even across repeated polishes
+    if (input !== lastPolished || !target.raw) target.raw = input;
+    const general = $('#edGeneral').checked;
+    const ctx = [`影片：${videoName}`, `位置：${general ? '整體意見（不指定時間碼）' : '時間碼 ' + $('#edTc').textContent}`,
+      `類別：${$('#edCat').value}`, terms().length ? `常用詞：${terms().join('、')}` : ''].filter(Boolean).join('\n');
+    const content = [];
+    const img = !general && (server() || settings.polishImage) && $('#edThumb').src.startsWith('data:image/jpeg') ? $('#edThumb').src : '';
+    if (img) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: img.split(',')[1] } });
+    content.push({ type: 'text', text: `${ctx}\n\n<原話>\n${target.raw}\n</原話>` });
+    const btn = $('#btnPolish');
+    btn.disabled = true; status('AI 潤飾中…');
+    try {
+      let out;
+      if (server()) {
+        out = (await api.req('/polish', { method: 'POST', json: { raw: target.raw, videoName, tc: $('#edTc').textContent, cat: $('#edCat').value, general, image: img } })).text;
+      } else {
+      const client = await claudeClient();
+      const model = settings.polishModel;
+      const msg = await client.beta.messages.create({
+        model, max_tokens: 4000,
+        output_config: { effort: 'low' },
+        // Haiku has no server-side fallback; Opus / Sonnet re-run a declined request on Anthropic's recommended model
+        ...(model === 'claude-haiku-5-5' ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }),
+        system: POLISH_SYSTEM,
+        messages: [{ role: 'user', content }],
+      });
+      if (msg.stop_reason === 'refusal') throw new Error('模型拒絕處理這段內容');
+      out = msg.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      }
+      out = tw(out.trim());
+      if (!out) throw new Error('沒有回傳內容');
+      if (editing !== target) return;
+      $('#edText').value = lastPolished = out;
+      $('#btnRaw').hidden = false;
+      status('已潤飾。可以再手動調整；按「原始口述」可換回原話。');
+      $('#edText').focus();
+    } catch (err) {
+      status('AI 潤飾失敗：' + (err.error?.error?.message || err.message));
+    } finally { btn.disabled = false; }
+  }
+  $('#btnPolish').onclick = polish;
+  $('#btnRaw').onclick = () => { if (editing?.raw) { $('#edText').value = editing.raw; status('已換回原始口述。'); } };
+
+  // ---------- list ----------
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function render() {
+    const hide = $('#hideDone').checked, shown = notes.filter(n => !hide || !n.done);
+    $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}` : '';
+    $('#list').innerHTML = shown.length ? shown.map(n => `
+      <div class="note${n.done ? ' done' : ''}${n.general ? ' general' : ''}${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
+        <img src="${n.thumb || ''}" data-act="seek" alt="">
+        <div>
+          <div class="meta">
+            <button class="tcbtn" data-act="seek">${label(n)}</button>
+            <span class="chip">#${notes.indexOf(n) + 1}</span>
+            ${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}
+            ${n.by ? `<span class="small muted">${esc(n.by)}</span>` : ''}
+            ${n.author && n.author !== 'owner' && api.mode === 'owner' ? '<span class="chip st-changes">外部</span>' : ''}
+          </div>
+          <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
+          ${n.raw ? `<details class="small muted"><summary>原始口述</summary>${esc(n.raw)}</details>` : ''}
+          <div class="actions">
+            ${api.mode === 'guest' ? '' : `<button data-act="done">${n.done ? ic('undo') + '未完成' : ic('check') + '已修改'}</button>`}
+            <button data-act="edit">編輯</button>
+            <button data-act="del">刪除</button>
+          </div>
+        </div>
+      </div>`).join('') : `<div class="muted small">${notes.length ? '全部完成了，辛苦了！' : '還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。'}</div>`;
+    const tl = $('#timeline');
+    tl.querySelectorAll('.pin').forEach(p => p.remove());
+    if (video.duration) for (const n of notes.filter(n => !n.general)) {
+      const p = document.createElement('div');
+      p.className = 'pin' + (n.done ? ' done' : '');
+      p.style.left = (n.t / video.duration * 100) + '%';
+      p.title = `${tcOfFrame(n.frame)} ${n.text}`;
+      p.onclick = () => { video.pause(); activeId = n.id; seekFrame(n.frame); render(); refreshPt(); };
+      tl.appendChild(p);
+    }
+  }
+  $('#hideDone').onchange = render;
+  $('#list').addEventListener('click', e => {
+    const act = e.target.dataset.act, el = e.target.closest('.note');
+    if (!act || !el) return;
+    const n = notes.find(n => n.id === el.dataset.id);
+    if (act === 'seek') { video.pause(); activeId = n.id; if (!n.general) seekFrame(n.frame); render(); refreshPt(); }
+    if (act === 'done') { n.done = !n.done; persist(n); render(); }
+    if (act === 'edit') { if (!n.general) seekFrame(n.frame); openEditor(n); $('#edText').focus(); }
+    if (act === 'del' && confirm(`刪除「${label(n)}」這則意見？`)) { notes.splice(notes.indexOf(n), 1); unpersist(n); render(); }
+  });
+  $('#list').addEventListener('blur', e => {
+    if (e.target.dataset.act !== 'text') return;
+    const n = notes.find(n => n.id === e.target.closest('.note').dataset.id);
+    const v = e.target.innerText.trim();
+    if (n && v && v !== n.text) { n.text = v; persist(n); }
+  }, true);
+
+  // ---------- keyboard ----------
+  document.addEventListener('keydown', e => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+    if (editing && e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
+    if (editing && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); return; }
+    if (typing || $('#settings').open || !video.src) return;
+    const step = 1 / fpsInfo()[0];
+    switch (e.key) {
+      case ' ': case 'k': case 'K': e.preventDefault(); video.paused && e.key === ' ' ? video.play() : video.pause(); video.playbackRate = 1; break;
+      case 'Enter': e.preventDefault(); if (!editing) { openEditor(); $('#edText').focus(); } break;
+      case 'g': case 'G': e.preventDefault(); if (!editing) { openEditor(null, true); $('#edText').focus(); } break;
+      case 'v': case 'V': e.preventDefault(); if (rec.active) rec.stop(); else { if (!editing) openEditor(); rec.start(); } break;
+      case 'ArrowLeft': e.preventDefault(); video.pause(); video.currentTime = Math.max(0, video.currentTime - (e.shiftKey ? 1 : step)); break;
+      case 'ArrowRight': e.preventDefault(); video.pause(); video.currentTime = Math.min(video.duration, video.currentTime + (e.shiftKey ? 1 : step)); break;
+      case 'l': case 'L': video.playbackRate = video.paused ? 1 : Math.min(4, video.playbackRate * 2); video.play(); break;
+      case 'j': case 'J': video.pause(); video.currentTime = Math.max(0, video.currentTime - 5); break;
+      case '[': case ']': jumpNote(e.key === ']' ? 1 : -1); break;
+    }
+  });
+
+  // ---------- export ----------
+  const base = () => (videoName.replace(/\.[^.]+$/, '') || '影片') + '_修改表';
+  async function download(name, content, type) {
+    $('#exportMenu').open = false;
+    // on phones, open the share sheet (LINE, Mail, Files…) instead of a bare download
+    if (matchMedia('(pointer: coarse)').matches && navigator.canShare) {
+      const file = new File([content], name, { type: type.split(';')[0] });
+      if (navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: name }); return; }
+        catch (err) { if (err.name === 'AbortError') return; } // other errors (e.g. expired user gesture) fall through to a download
+      }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([content], { type }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const rows = () => notes.map((n, i) => [i + 1, label(n), n.general ? '' : n.t.toFixed(3), n.cat, n.text, n.done ? '已修改' : '待修改', n.by || '', n.raw || '']);
+  const timedNotes = () => notes.filter(n => !n.general);
+  const HEAD = ['編號', '時間碼', '秒數', '類別', '修改內容', '狀態', '審片人', '原始口述'];
+  const need = () => notes.length || (alert('還沒有任何意見'), false);
+
+  $('#btnCsv').onclick = () => {
+    if (!need()) return;
+    const q = v => `"${String(v).replace(/"/g, '""')}"`;
+    download(base() + '.csv', '\ufeff' + [HEAD, ...rows()].map(r => r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+  };
+  $('#btnCopy').onclick = async () => {
+    if (!need()) return;
+    const clean = v => String(v).replace(/[\t\r\n]+/g, ' ');
+    const tsv = [HEAD, ...rows()].map(r => r.map(clean).join('\t')).join('\n');
+    try { await navigator.clipboard.writeText(tsv); alert('已複製，直接貼到 Excel 或 Google 試算表即可'); }
+    catch { download(base() + '.tsv', tsv, 'text/tab-separated-values'); }
+  };
+  $('#btnSrt').onclick = () => {
+    if (!need()) return;
+    const timed = timedNotes();
+    if (!timed.length) return alert('沒有指定時間碼的意見');
+    const srt = timed.map((n, i) => {
+      const end = Math.min(n.t + 3, timed[i + 1] ? timed[i + 1].t : Infinity, video.duration || Infinity);
+      return `${i + 1}\n${srtTime(n.t)} --> ${srtTime(Math.max(end, n.t + 0.5))}\n#${notes.indexOf(n) + 1} [${n.cat}] ${n.text}\n`;
+    }).join('\n');
+    download(base() + '.srt', srt, 'text/plain;charset=utf-8');
+  };
+  $('#btnJson').onclick = () => {
+    if (!need()) return;
+    download(base() + '.json', JSON.stringify({ video: videoName, fps: $('#fps').value, startTc: $('#startTc').value, notes }, null, 2), 'application/json');
+  };
+  $('#btnImport').onclick = () => $('#importFile').click();
+  $('#importFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const have = new Set(notes.map(n => n.id));
+      const added = (data.notes || []).filter(n => !have.has(n.id));
+      // re-derive frames in case the other reviewer used a different fps setting
+      added.forEach(n => { n.frame = n.general ? null : frameOf(n.t); });
+      notes.push(...added); notes.sort(byTime);
+      if (project.remote) added.forEach(persist); else save();
+      render(); alert(`合併了 ${added.length} 則意見`);
+    } catch (err) { alert('無法讀取：' + err.message); }
+  };
+  $('#btnXml').onclick = () => {
+    if (!need()) return;
+    const [, tb, ntsc] = fpsInfo(), x = esc;
+    const timed = timedNotes();
+    if (!timed.length) return alert('沒有指定時間碼的意見');
+    const dur = Math.max(1, Math.ceil((video.duration || timed.at(-1).t + 1) * fpsInfo()[0]));
+    const rate = `<rate><timebase>${tb}</timebase><ntsc>${ntsc ? 'TRUE' : 'FALSE'}</ntsc></rate>`;
+    const w = video.videoWidth || 1920, h = video.videoHeight || 1080;
+    const markers = timed.map(n =>
+      `<marker><name>${x(`#${notes.indexOf(n) + 1} ${n.cat}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${n.frame}</in><out>-1</out></marker>`).join('\n      ');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xmeml>
+<xmeml version="4">
+  <sequence id="sequence-1">
+    <name>${x(base())}</name>
+    <duration>${dur}</duration>
+    ${rate}
+    <timecode>${rate}<string>${x($('#startTc').value)}</string><frame>${offsetFrames()}</frame><displayformat>NDF</displayformat></timecode>
+    <media>
+      <video>
+        <format><samplecharacteristics>${rate}<width>${w}</width><height>${h}</height><pixelaspectratio>square</pixelaspectratio></samplecharacteristics></format>
+        <track>
+          <clipitem id="clipitem-1">
+            <name>${x(videoName)}</name><duration>${dur}</duration>${rate}
+            <start>0</start><end>${dur}</end><in>0</in><out>${dur}</out>
+            <file id="file-1">
+              <name>${x(videoName)}</name><pathurl>${x(encodeURI(videoName))}</pathurl>${rate}<duration>${dur}</duration>
+              <media><video><samplecharacteristics><width>${w}</width><height>${h}</height></samplecharacteristics></video><audio><channelcount>2</channelcount></audio></media>
+            </file>
+          </clipitem>
+        </track>
+      </video>
+      <audio>
+        <track>
+          <clipitem id="clipitem-2">
+            <name>${x(videoName)}</name><duration>${dur}</duration>${rate}
+            <start>0</start><end>${dur}</end><in>0</in><out>${dur}</out>
+            <file id="file-1"/>
+            <sourcetrack><mediatype>audio</mediatype><trackindex>1</trackindex></sourcetrack>
+          </clipitem>
+        </track>
+      </audio>
+    </media>
+      ${markers}
+  </sequence>
+</xmeml>
+`;
+    download(base() + '_Premiere標記.xml', xml, 'application/xml');
+  };
+  // ---------- document export (screenshots + text) ----------
+  const loadScript = src => new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) return res();
+    const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 ' + src));
+    document.head.appendChild(s);
+  });
+  function waitSeek(f) {
+    return new Promise(res => {
+      let done = false;
+      const fin = () => { if (done) return; done = true; video.removeEventListener('seeked', fin); requestAnimationFrame(() => res()); };
+      video.addEventListener('seeked', fin); setTimeout(fin, 2000);
+      seekFrame(f);
+    });
+  }
+  // re-grab each timed note at full resolution (the stored thumbnails are small to keep storage light)
+  async function captureFrames(btn) {
+    const label0 = btn.textContent, back = video.currentTime, out = {};
+    video.pause();
+    const timed = timedNotes();
+    for (let i = 0; i < timed.length; i++) {
+      btn.textContent = `擷取畫面 ${i + 1}/${timed.length}…`;
+      await waitSeek(timed[i].frame);
+      const c = document.createElement('canvas'), w = Math.min(1280, video.videoWidth || 1280);
+      c.width = w; c.height = Math.round(w * (video.videoHeight || 720) / (video.videoWidth || 1280));
+      c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+      drawPt(c.getContext('2d'), c.width, c.height, timed[i].pt);
+      try { out[timed[i].id] = { url: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height }; } catch { break; } // cross-origin video: no screenshots
+    }
+    video.currentTime = back; btn.textContent = label0;
+    return out;
+  }
+  const reviewers = () => [...new Set(notes.map(n => n.by).filter(Boolean))].join('、');
+  function reportHtml(shots) {
+    const general = notes.filter(n => n.general), timed = timedNotes();
+    const st = n => `<span class="st ${n.done ? 'ok' : ''}">${n.done ? '已修改' : '待修改'}</span>`;
+    const by = n => n.by ? `<div class="by">— ${esc(n.by)}</div>` : '';
+    return `<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(base())}</title><style>
+body{font:14px/1.6 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1c1917;background:#fff;max-width:1000px;margin:0 auto;padding:24px 16px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 10px;border-bottom:2px solid #1c1917;padding-bottom:4px}
+.meta{color:#57534e;font-size:13px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d6d3d1;padding:8px;vertical-align:top;text-align:left}
+th{background:#f5f5f4;font-size:13px}td.n{width:32px;text-align:center}td.img{width:300px}td.img img{width:100%;display:block;border-radius:4px}
+.tc{font:600 14px ui-monospace,Menlo,monospace}.cat{display:inline-block;background:#f1f5f9;border-radius:999px;padding:0 8px;font-size:12px;margin-top:4px}
+.txt{white-space:pre-wrap}.by{color:#78716c;font-size:12px;margin-top:4px}.st{font-size:12px;color:#b45309}.st.ok{color:#15803d}
+ol.g li{margin:6px 0}@media print{body{padding:0}tr{page-break-inside:avoid}}
+</style></head><body>
+<h1>${esc(base())}</h1>
+<div class="meta">影片：${esc(videoName)}　FPS：${esc($('#fps').value)}　${reviewers() ? '審片：' + esc(reviewers()) + '　' : ''}產出：${new Date().toLocaleString('zh-TW')}<br>
+共 ${notes.length} 則（整體 ${general.length}、逐點 ${timed.length}），已修改 ${notes.filter(n => n.done).length}</div>
+${general.length ? `<h2>整體意見</h2><ol class="g">${general.map(n => `<li><span class="cat">${esc(n.cat)}</span> <span class="txt">${esc(n.text)}</span> ${st(n)}${by(n)}</li>`).join('')}</ol>` : ''}
+${timed.length ? `<h2>逐點修改</h2><table><tr><th>#</th><th>畫面</th><th>時間碼 / 類別</th><th>修改內容</th></tr>
+${timed.map(n => `<tr><td class="n">${notes.indexOf(n) + 1}</td><td class="img">${shots[n.id] ? `<img src="${shots[n.id].url}" alt="">` : ''}</td>
+<td><div class="tc">${tcOfFrame(n.frame)}</div><div class="cat">${esc(n.cat)}</div></td>
+<td><div class="txt">${esc(n.text)}</div>${by(n)}<div>${st(n)}</div></td></tr>`).join('')}</table>` : ''}
+</body></html>`;
+  }
+  async function withBusy(btn, fn) {
+    if (!need() || btn.disabled) return;
+    btn.disabled = true;
+    try { await fn(); } catch (err) { alert('匯出失敗：' + err.message); } finally { btn.disabled = false; }
+  }
+  $('#btnReport').onclick = e => withBusy(e.currentTarget, async () => {
+    download(base() + '.html', reportHtml(await captureFrames(e.currentTarget)), 'text/html;charset=utf-8');
+  });
+  $('#btnPrint').onclick = e => withBusy(e.currentTarget, async () => {
+    const html = reportHtml(await captureFrames(e.currentTarget));
+    $('#printView').innerHTML = html.slice(html.indexOf('<style>'), html.indexOf('</style>') + 8) + html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'));
+    await Promise.all([...$('#printView').querySelectorAll('img')].map(i => i.decode?.().catch(() => {})));
+    window.print();
+  });
+  // the report's <style> is injected for printing only; drop it so it can't restyle the app
+  window.addEventListener('afterprint', () => { $('#printView').innerHTML = ''; });
+  $('#btnDocx').onclick = e => withBusy(e.currentTarget, async () => {
+    const btn = e.currentTarget;
+    btn.textContent = '載入中…';
+    await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js');
+    btn.textContent = '文件 (Word)';
+    const shots = await captureFrames(btn);
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, ShadingType } = window.docx;
+    const font = { ascii: 'Calibri', hAnsi: 'Calibri', eastAsia: 'Microsoft JhengHei' };
+    const lines = (text, opts = {}) => String(text).split('\n').map((t, i) => new TextRun({ text: t, break: i ? 1 : 0, ...opts }));
+    const P = (text, opts = {}) => new Paragraph({ children: lines(text, opts) });
+    const bytes = url => Uint8Array.from(atob(url.split(',')[1]), c => c.charCodeAt(0));
+    const cell = (children, pct, head) => new TableCell({ children, width: { size: pct, type: WidthType.PERCENTAGE },
+      ...(head ? { shading: { type: ShadingType.CLEAR, fill: 'F5F5F4', color: 'auto' } } : {}) });
+    const status = n => P(n.done ? '已修改' : '待修改', { color: n.done ? '15803D' : 'B45309', size: 18 });
+    const general = notes.filter(n => n.general), timed = timedNotes();
+    const children = [
+      new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(base())] }),
+      P(`影片：${videoName}　FPS：${$('#fps').value}${reviewers() ? '　審片：' + reviewers() : ''}`, { color: '57534E', size: 20 }),
+      P(`產出：${new Date().toLocaleString('zh-TW')}　共 ${notes.length} 則（整體 ${general.length}、逐點 ${timed.length}），已修改 ${notes.filter(n => n.done).length}`, { color: '57534E', size: 20 }),
+    ];
+    if (general.length) {
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('整體意見')] }));
+      general.forEach((n, i) => children.push(new Paragraph({ children: [
+        new TextRun({ text: `${i + 1}. `, bold: true }), new TextRun({ text: `[${n.cat}] `, color: '2563EB' }),
+        ...lines(n.text), new TextRun({ text: `　${n.done ? '已修改' : '待修改'}${n.by ? '　— ' + n.by : ''}`, color: '78716C', size: 18 })] })));
+    }
+    if (timed.length) {
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('逐點修改')] }));
+      const head = new TableRow({ tableHeader: true, children: ['#', '畫面', '時間碼 / 類別', '修改內容'].map((h, i) =>
+        cell([P(h, { bold: true })], [6, 40, 18, 36][i], true)) });
+      const body = timed.map(n => {
+        const s = shots[n.id], w = 230;
+        return new TableRow({ cantSplit: true, children: [
+          cell([P(String(notes.indexOf(n) + 1))], 6),
+          cell([new Paragraph({ children: s ? [new ImageRun({ data: bytes(s.url), transformation: { width: w, height: Math.round(w * s.h / s.w) } })] : [] })], 40),
+          cell([P(tcOfFrame(n.frame), { bold: true, font: 'Consolas' }), P(n.cat, { color: '2563EB', size: 18 })], 18),
+          cell([P(n.text), ...(n.by ? [P('— ' + n.by, { color: '78716C', size: 18 })] : []), status(n)], 36),
+        ] });
+      });
+      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [head, ...body] }));
+    }
+    const doc = new Document({ styles: { default: { document: { run: { font, size: 21 } } } },
+      sections: [{ properties: { page: { margin: { top: 1000, bottom: 1000, left: 900, right: 900 } } }, children }] });
+    download(base() + '.docx', await Packer.toBlob(doc), 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  });
+
+  // ---------- settings ----------
+  function openSettings() {
+    $('#setReviewer').value = settings.reviewer; $('#setEngine').value = settings.engine;
+    $('#setElKey').value = settings.elKey; $('#setOaKey').value = settings.oaKey;
+    $('#setTerms').value = settings.terms; $('#setCats').value = settings.cats;
+    $('#setDriveFolder').value = settings.driveFolder; $('#setGKey').value = settings.gKey;
+    $('#setAnKey').value = settings.anKey; $('#setPolishModel').value = settings.polishModel;
+    $('#setAutoPolish').checked = settings.autoPolish; $('#setPolishImage').checked = settings.polishImage;
+    $('#settings').showModal();
+  }
+  $('#btnSettings').onclick = openSettings;
+  $('#settings').addEventListener('close', () => {
+    Object.assign(settings, { reviewer: $('#setReviewer').value.trim(), engine: $('#setEngine').value,
+      elKey: $('#setElKey').value.trim(), oaKey: $('#setOaKey').value.trim(), terms: $('#setTerms').value,
+      cats: $('#setCats').value.trim() || DEFAULT_CATS, anKey: $('#setAnKey').value.trim(),
+      polishModel: $('#setPolishModel').value, autoPolish: $('#setAutoPolish').checked, polishImage: $('#setPolishImage').checked,
+      driveFolder: $('#setDriveFolder').value.trim(), gKey: $('#setGKey').value.trim() });
+    store.set('vrn.settings', settings);
+    if (api.mode === 'owner')
+      api.req('/config', { method: 'PUT', json: pickConfig(settings) }).then(() => toast('設定已儲存，所有裝置和分享連結都會套用')).catch(err => toast('設定沒有存到雲端：' + err.message));
+    if (!$('#loader').hidden) listDrive();
+  });
+  // ---------- review status (Frame.io-style: one simple field per video) ----------
+  function renderStatus() {
+    const bar = $('#statusBar');
+    bar.hidden = !(server() && project.remote);
+    if (bar.hidden) return;
+    const info = project.info || {}, st = info.status || 'review';
+    $('#statusText').innerHTML = statusChip(st) + (info.statusBy ? ` <span class="small muted">${esc(info.statusBy)}・${new Date(info.statusAt).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>` : '');
+    bar.querySelectorAll('[data-status]').forEach(b => b.classList.toggle('on', b.dataset.status === st));
+  }
+  $('#statusBar').addEventListener('click', async e => {
+    const st = e.target.closest('[data-status]')?.dataset.status;
+    if (!st) return;
+    if (api.mode === 'guest' && !confirm(st === 'approved' ? '確定核准這支影片嗎？' : '確定標為「需要修改」嗎？請先把要改的地方留言。')) return;
+    try {
+      const { info } = api.mode === 'guest'
+        ? await api.req('/status', { method: 'POST', json: { status: st } })
+        : await api.req(`/videos/${encodeURIComponent(project.remote)}`, { method: 'PATCH', json: { status: st } });
+      project.info = info; renderStatus();
+      toast(api.mode === 'guest' ? '已送出，對方會收到通知。謝謝！' : '已更新審核狀態');
+    } catch (err) { toast(err.message); }
+  });
+
+  // ---------- share links for outside reviewers (owner) ----------
+  const shareUrl = token => `${location.origin}/s/#t=${token}`;
+  const shareMessage = (label, token, expires, hasPin) =>
+    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言：\n${shareUrl(token)}\n（連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); toast('已複製，可以貼給對方了'); } catch { prompt('請複製這段文字：', t); }
+  }
+  const deviceOf = (ua = '') => {
+    const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : '';
+    const br = /Edg\//.test(ua) ? 'Edge' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : /Firefox/.test(ua) ? 'Firefox' : '';
+    return [os, br].filter(Boolean).join(' ') || '未知裝置';
+  };
+  $('#btnShare').onclick = () => {
+    $('#shareVideo').textContent = videoName;
+    $('#shareResult').hidden = true; $('#shareForm').reset();
+    $('#shareDlg').showModal(); loadShares();
+  };
+  $('#shareForm').onsubmit = async e => {
+    e.preventDefault();
+    const btn = e.submitter; btn.disabled = true;
+    try {
+      const label = $('#shLabel').value.trim();
+      const r = await api.req(`/videos/${encodeURIComponent(project.remote)}/shares`, { method: 'POST',
+        json: { label, days: +$('#shDays').value, lockDevice: $('#shLock').checked, pin: $('#shPin').checked } });
+      $('#shareMsg').value = shareMessage(label, r.token, r.expires, !!r.pin);
+      $('#sharePin').hidden = !r.pin;
+      if (r.pin) $('#sharePin').innerHTML = `密碼：<strong style="font-size:20px; letter-spacing:4px">${r.pin}</strong>　<button type="button" data-pin="${r.pin}">複製密碼</button>
+        <div class="small muted">請用另一個管道傳給對方，例如連結用 Email、密碼用 LINE。</div>`;
+      $('#shareResult').hidden = false;
+      loadShares();
+    } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+  };
+  $('#sharePin').onclick = e => { if (e.target.dataset.pin) copyText(e.target.dataset.pin); };
+  $('#shCopy').onclick = () => copyText($('#shareMsg').value);
+  $('#shSend').onclick = async () => {
+    try { await navigator.share({ text: $('#shareMsg').value }); }
+    catch (err) { if (err.name !== 'AbortError') copyText($('#shareMsg').value); }
+  };
+  $('#shClose').onclick = () => $('#shareDlg').close();
+  async function loadShares() {
+    const box = $('#shareList');
+    try {
+      const { shares, limit } = await api.req(`/videos/${encodeURIComponent(project.remote)}/shares`);
+      box.innerHTML = shares.length ? shares.map(sh => {
+        const last = sh.recent[0], expired = sh.expires < Date.now();
+        return `<div class="shareRow" data-id="${esc(sh.id)}" data-token="${esc(sh.token)}" data-label="${esc(sh.label)}" data-expires="${sh.expires}" data-pin="${sh.pin ? 1 : ''}">
+          <strong>${esc(sh.label)}</strong>
+          ${expired ? '<span class="chip fresh">已過期</span>' : `<span class="chip">到 ${new Date(sh.expires).toLocaleDateString('zh-TW')}</span>`}
+          ${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
+          <div>${sh.opens ? `打開 ${sh.opens} 次・最近 ${new Date(last.at).toLocaleString('zh-TW')}${last.place ? '・' + esc(last.place) : ''}・${esc(deviceOf(last.ua))}` : '對方還沒打開'}</div>
+          <div>今天語音／AI：${sh.used}／${limit} 次</div>
+          <div class="bar"><button data-act="copy">複製訊息</button>${sh.used >= limit ? `<button data-act="more">再加 ${limit} 次</button>` : ''}<button data-act="revoke">取消分享</button></div>
+        </div>`;
+      }).join('') : '還沒有分享給任何人。';
+    } catch (err) { box.textContent = '讀取失敗：' + err.message; }
+  }
+  $('#shareList').addEventListener('click', async e => {
+    const act = e.target.dataset.act, row = e.target.closest('.shareRow');
+    if (!act || !row) return;
+    const d = row.dataset;
+    if (act === 'copy') copyText(shareMessage(d.label, d.token, +d.expires, !!d.pin));
+    if (act === 'revoke' && confirm(`取消分享給「${d.label}」？連結會立刻失效。`)) {
+      await api.req(`/shares/${encodeURIComponent(d.id)}`, { method: 'DELETE' }).catch(err => toast(err.message));
+      loadShares();
+    }
+    if (act === 'more') {
+      await api.req(`/shares/${encodeURIComponent(d.id)}/more`, { method: 'POST' }).then(() => toast('已增加今天的次數')).catch(err => toast(err.message));
+      loadShares();
+    }
+  });
+
+  // ---------- owner notifications (guest approved / asked for changes / used up the daily allowance) ----------
+  async function loadAlerts() {
+    if (api.mode !== 'owner' || document.hidden) return;
+    try {
+      const { alerts } = await api.req('/alerts');
+      const bar = $('#alertBar');
+      bar.hidden = !alerts.length;
+      const more = alerts.length > 2 ? `<span class="small muted">還有 ${alerts.length - 2} 則較早的通知</span>` : '';
+      bar.innerHTML = alerts.slice(0, 2).map(a => `<div class="alert">${ic('bell')}<span>${esc(a.text)}</span>
+        ${a.kind === 'limit' && a.share ? `<button data-more="${esc(a.share)}">再加 ${api.limit} 次</button>` : '<span></span>'}
+        <time>${new Date(a.at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div>`).join('')
+        + `<div class="row">${more}<span style="flex:1"></span><button data-seen="1" class="ghost">知道了</button></div>`;
+    } catch {}
+  }
+  $('#alertBar').addEventListener('click', async e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.more) {
+      await api.req(`/shares/${encodeURIComponent(b.dataset.more)}/more`, { method: 'POST' }).then(() => { toast('已增加今天的次數'); b.remove(); }).catch(err => toast(err.message));
+    }
+    if (b.dataset.seen) { await api.req('/alerts/seen', { method: 'POST' }).catch(() => {}); $('#alertBar').hidden = true; }
+  });
+
+  // pick up outside reviewers' new notes while the owner has the video open
+  const sig = list => JSON.stringify(list.map(n => [n.id, n.text, n.done, n.cat]).sort());
+  async function syncNotes() {
+    if (api.mode !== 'owner' || !project.remote || editing || document.hidden || document.activeElement?.isContentEditable) return;
+    const id = project.remote;
+    try {
+      const { notes: fresh } = await api.req(`/videos/${encodeURIComponent(id)}/notes`);
+      if (editing || id !== project.remote || sig(fresh) === sig(notes)) return;
+      notes = fresh.sort(byTime); render();
+    } catch {}
+  }
+
+  // ---------- first-visit tour ----------
+  const TOURS = {
+    owner: [
+      ['film', '選一支影片', '從「影片資料夾」點一支影片，也可以選電腦或手機裡的檔案。'],
+      ['mic', '看到要改的地方，說出來', '按「語音意見」直接講，或按「文字意見」打字。點一下畫面，可以標出你說的位置。'],
+      ['sparkle', 'AI 幫你整理', '口語會自動整理成剪接師看得懂的修改指示，確認後按「儲存」。'],
+      ['link', '給客戶看、做成文件', '按「分享給外部審片」產生連結貼給客戶，他的意見會自動回到這裡。最後用「匯出」做成含截圖的 Word 文件。'],
+    ],
+    guest: [
+      ['playCircle', '歡迎！', '這支影片分享給你審片。播放影片，看到想修改的地方就按暫停。'],
+      ['mic', '用說的或打字', '按下方「語音意見」直接說，或按「文字意見」打字。點一下畫面，可以標出你說的位置。'],
+      ['sparkle', '自動整理成清楚的說明', '你說的話會整理成清楚的修改說明，看一下沒問題就按「儲存」。'],
+      ['checkCircle', '看完了嗎？', '在「修改清單」上方按「核准」或「需要修改」，我們就會收到通知。'],
+    ],
+  };
+  let tour = { steps: [], i: 0 };
+  function showTour() {
+    const steps = TOURS[api.mode === 'guest' ? 'guest' : 'owner'].slice();
+    if (!server()) steps[3] = ['doc', '做成文件', '用右上「匯出」做成含截圖的 Word 文件、Excel 表格或 Premiere 標記。'];
+    tour = { steps, i: 0 }; drawTour(); $('#tour').showModal();
+  }
+  function drawTour() {
+    const [icon, title, text] = tour.steps[tour.i], last = tour.i === tour.steps.length - 1;
+    $('#tourBody').innerHTML = `<div class="tour-step"><div class="badge">${ic(icon)}</div><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
+    $('#tourDots').innerHTML = tour.steps.map((_, i) => `<i class="${i === tour.i ? 'on' : ''}"></i>`).join('');
+    $('#tourPrev').hidden = tour.i === 0;
+    $('#tourNext').textContent = last ? '開始使用' : '下一步';
+    $('#tourSkip').hidden = last;
+  }
+  const endTour = () => { store.set('vrn.tour.' + (api.mode === 'guest' ? 'guest' : 'owner'), 1); $('#tour').close(); };
+  $('#tourNext').onclick = () => { if (tour.i < tour.steps.length - 1) { tour.i++; drawTour(); } else endTour(); };
+  $('#tourPrev').onclick = () => { tour.i--; drawTour(); };
+  $('#tourSkip').onclick = endTour;
+  $('#tour').addEventListener('cancel', () => store.set('vrn.tour.' + (api.mode === 'guest' ? 'guest' : 'owner'), 1));
+  $('#btnHelp').onclick = showTour;
+  const maybeTour = () => { if (!store.get('vrn.tour.' + (api.mode === 'guest' ? 'guest' : 'owner'), 0)) showTour(); };
+
+  // ---------- light / dark ----------
+  const prefersDark = matchMedia('(prefers-color-scheme: dark)');
+  const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : prefersDark.matches;
+  const themeIcon = () => { $('#btnTheme').innerHTML = ic(isDark() ? 'sun' : 'moon'); };
+  const savedTheme = store.get('vrn.theme', '');
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  $('#btnTheme').onclick = () => {
+    const next = isDark() ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next; store.set('vrn.theme', next); themeIcon();
+  };
+  prefersDark.addEventListener?.('change', themeIcon);
+  themeIcon();
+
+  // ---------- start ----------
+  const CONFIG_KEYS = ['reviewer', 'terms', 'cats', 'polishModel', 'autoPolish', 'polishImage'];
+  const pickConfig = c => Object.fromEntries(CONFIG_KEYS.filter(k => k in c).map(k => [k, c[k]]));
+
+  function showGate(msg, askPin) {
+    document.querySelector('main').hidden = true;
+    const g = $('#gate'); g.hidden = false;
+    g.innerHTML = askPin
+      ? `<div class="badge">${ic('lock')}</div><h3>請輸入密碼</h3><p>${esc(msg)}</p><form id="pinForm"><input id="pinInput" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required>
+         <div class="bar" style="justify-content:center"><button class="primary">進入</button></div></form>`
+      : `<div class="badge">${ic('alert')}</div><h3>無法開啟</h3><p>${esc(msg)}</p>`;
+    if (askPin) {
+      $('#pinInput').focus();
+      $('#pinForm').onsubmit = e => { e.preventDefault(); api.pin = $('#pinInput').value.trim(); startGuest(); };
+    }
+  }
+  async function startGuest() {
+    api.mode = 'guest';
+    document.body.classList.add('server', 'guest');
+    api.token = new URLSearchParams(location.hash.slice(1)).get('t') || '';
+    $('#loader').hidden = true;
+    let info;
+    try { info = await api.req('/info'); }
+    catch (err) { return showGate(err.message, err.data?.code === 'pin'); }
+    $('#gate').hidden = true; document.querySelector('main').hidden = false;
+    Object.assign(settings, { reviewer: info.name, cats: info.config.cats, autoPolish: info.config.autoPolish, engine: 'elevenlabs' });
+    api.limit = info.limit;
+    $('#who').textContent = `${info.name}・審片`;
+    video.src = api.media(info.video.id);
+    openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: info.notes });
+    maybeTour();
+  }
+  async function init() {
+    if (/\/s\/?$/.test(location.pathname)) return startGuest();
+    try {
+      const r = await fetch('/api/me', { credentials: 'same-origin' });
+      if (r.ok && (r.headers.get('content-type') || '').includes('json')) {
+        const me = await r.json();
+        api.mode = 'owner'; api.limit = me.limit;
+        Object.assign(settings, pickConfig(me.config));
+        if (settings.engine === 'openai') settings.engine = 'elevenlabs';
+        document.body.classList.add('server', 'owner');
+        $('#otherSrc').open = false;
+        $('#who').textContent = me.email;
+        loadAlerts(); setInterval(loadAlerts, 60e3);
+        setInterval(syncNotes, 20e3);
+      }
+    } catch {} // no backend here (GitHub Pages, a local file): keys stay in this browser
+    listDrive();
+    maybeTour();
+  }
+  init();
+})();
+</script>
+</body>
+</html>

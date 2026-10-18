@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><defs><clipPath id="inBubble"><path d="M80 66 H160 A40 40 0 0 1 160 146 H106 L71 176 Q63 182 64.5 172.5 L68 144.16 A40 40 0 0 1 80 66 Z"/></clipPath></defs><rect width="240" height="240" fill="#3B2BFF"/><g transform="translate(24 24) scale(.8)"><g>
+  <path d="M80 66 H160 A40 40 0 0 1 160 146 H106 L71 176 Q63 182 64.5 172.5 L68 144.16 A40 40 0 0 1 80 66 Z" fill="#E4FF5C"/>
+  <path d="M66 98 H116 M66 120 H100" stroke="#0F0C2E" stroke-width="12" stroke-linecap="round"/>
+  <path d="M150 58 V206" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round"/>
+  <path d="M150 58 V206" stroke="#0F0C2E" stroke-width="11" clip-path="url(#inBubble)"/>
+  <path d="M131 30 H169 Q177 30 172 37 L154 62 Q150 67 146 62 L128 37 Q123 30 131 30 Z" fill="#FF6B4A"/>
+</g></g></svg>
