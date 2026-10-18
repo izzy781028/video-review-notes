@@ -30,6 +30,7 @@
     --accent: #6250d6; --accent-soft: rgba(98,80,214,.12); --accent-ink: #fff;
     --hero-from: #6f7cf5; --hero-to: #8a5cf0;
     --good: #0ca30c; --warning: #b07800; --rec: #d03b3b; --done: #0ca30c; --chip: rgba(98,80,214,.10);
+    --key-bg: linear-gradient(180deg, #fff, #f1f0f8); --key-border: rgba(29,27,46,.16); --key-shadow: 0 1px 1.5px rgba(76,70,140,.14);
     --panel: var(--glass-strong);
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
@@ -44,6 +45,7 @@
     --ink: #f0eff6; --ink-2: #c2c1d2; --muted: #8f8ea3; --line: rgba(255,255,255,.10);
     --accent: #9085e9; --accent-soft: rgba(144,133,233,.16); --hero-from: #4e57c9; --hero-to: #6c45c4;
     --good: #2fbf4a; --warning: #fab219; --rec: #e66767; --done: #2fbf4a; --chip: rgba(144,133,233,.16);
+    --key-bg: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07)); --key-border: rgba(255,255,255,.18); --key-shadow: 0 1px 2px rgba(0,0,0,.4);
   } }
   :root[data-theme="dark"] {
     color-scheme: dark;
@@ -57,6 +59,7 @@
     --ink: #f0eff6; --ink-2: #c2c1d2; --muted: #8f8ea3; --line: rgba(255,255,255,.10);
     --accent: #9085e9; --accent-soft: rgba(144,133,233,.16); --hero-from: #4e57c9; --hero-to: #6c45c4;
     --good: #2fbf4a; --warning: #fab219; --rec: #e66767; --done: #2fbf4a; --chip: rgba(144,133,233,.16);
+    --key-bg: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07)); --key-border: rgba(255,255,255,.18); --key-shadow: 0 1px 2px rgba(0,0,0,.4);
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -93,7 +96,11 @@
   #statusBar button.on { box-shadow: none; }
   .toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
   .edActions { margin-top: 8px; }
-  .kbdhint { opacity: .75; }
+  .kbdhint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; margin-top: 12px; padding: 7px 14px;
+    border-radius: 14px; background: var(--glass-flat); border: 1px solid var(--line); }
+  .hk { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
+  .hk span { margin-left: 5px; }
+  .hk i { font-style: normal; color: var(--muted); font-size: 11px; margin: 0 1px; }
   .iconLabel { display: inline-flex; align-items: center; gap: 6px; }
   .iconLabel .ic { color: var(--accent); }
   .menu-list button { justify-content: flex-start; }
@@ -199,7 +206,11 @@
   dialog label { display: block; margin: 10px 0 4px; font-weight: 600; }
   dialog input, dialog select, dialog textarea { width: 100%; }
   dialog textarea { min-height: 90px; padding: 6px 8px; }
-  kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 4px; opacity: .8; }
+  kbd { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 22px; height: 22px; padding: 0 6px;
+    font: 600 11.5px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; color: var(--ink);
+    background: var(--key-bg); border: 1px solid var(--key-border); border-bottom-width: 2px; border-radius: 6px; box-shadow: var(--key-shadow); }
+  button kbd { min-width: 20px; height: 20px; margin-left: 4px; font-size: 11px; color: var(--ink-2); }
+  button.primary kbd { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.38); color: #fff; box-shadow: none; }
   .menu { position: relative; }
   .menu summary { list-style: none; }
   .menu summary::-webkit-details-marker { display: none; }
@@ -385,12 +396,16 @@
         <button data-step="next" title="下一則意見">意見<i data-ic="next"></i></button>
       </div>
       <div class="bar" id="addBar">
-        <button id="btnAddVoice" class="primary" title="快捷鍵 V"><i data-ic="mic"></i>語音意見</button>
-        <button id="btnAddText" title="快捷鍵 Enter"><i data-ic="pencil"></i>文字意見</button>
-        <button id="btnAddGeneral" title="不針對特定時間碼，針對整支影片的意見"><i data-ic="clipboard"></i>整體意見</button>
+        <button id="btnAddVoice" class="primary" title="快捷鍵 V"><i data-ic="mic"></i>語音意見<kbd>V</kbd></button>
+        <button id="btnAddText" title="快捷鍵 Enter"><i data-ic="pencil"></i>文字意見<kbd>Enter</kbd></button>
+        <button id="btnAddGeneral" title="不針對特定時間碼，針對整支影片的意見"><i data-ic="clipboard"></i>整體意見<kbd>G</kbd></button>
       </div>
-      <div class="small muted kbdhint" style="margin-top:6px">
-        <kbd>Space</kbd> 播放/暫停　<kbd>←</kbd><kbd>→</kbd> 前後一格　<kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 前後一秒　<kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> 倒退/停/快轉　<kbd>[</kbd><kbd>]</kbd> 上/下一則意見
+      <div class="kbdhint" aria-label="快捷鍵">
+        <span class="hk"><kbd>Space</kbd><span>播放／暫停</span></span>
+        <span class="hk"><kbd>←</kbd><kbd>→</kbd><span>逐格</span></span>
+        <span class="hk"><kbd>Shift</kbd><i>+</i><kbd>←</kbd><kbd>→</kbd><span>跳 1 秒</span></span>
+        <span class="hk"><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><span>變速播放</span></span>
+        <span class="hk"><kbd>[</kbd><kbd>]</kbd><span>上／下一則</span></span>
       </div>
 
       <div id="editor" class="panel">
