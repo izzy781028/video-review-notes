@@ -470,8 +470,8 @@
         <button id="btnRate" class="small ghost" title="播放速度">1×</button>
         <button id="btnLoop" class="small ghost iconBtn" title="循環播放選中的意見或 I／O 標出的區段" aria-label="循環播放"><i data-ic="loop"></i></button>
         <select id="safeSel" title="安全框（社群平台介面會蓋住的範圍）" aria-label="安全框">
-          <option value="off">安全框：關</option><option value="reels">IG Reels</option><option value="tiktok">TikTok</option>
-          <option value="shorts">YouTube Shorts</option><option value="title">字幕安全 90%</option>
+          <option value="off">安全框：關</option><option value="reels" data-v="1">IG Reels</option><option value="tiktok" data-v="1">TikTok</option>
+          <option value="shorts" data-v="1">YouTube Shorts</option><option value="title">動作 93%／字幕 90%</option>
         </select>
       </span>
       </div>
@@ -560,7 +560,7 @@
   <form method="dialog">
     <h3 style="margin-top:0">設定</h3>
     <div class="bar" style="margin-top:0">
-      <label style="flex:1">FPS（這支影片）
+      <label style="flex:1">FPS（這支影片）<span id="fpsHow" class="small muted" style="font-weight:400"></span>
         <select id="fps">
           <option>23.976</option><option>24</option><option>25</option><option selected>29.97</option>
           <option>30</option><option>50</option><option>59.94</option><option>60</option>
@@ -568,6 +568,8 @@
       </label>
       <label style="flex:1">起始時間碼 <input id="startTc" type="text" value="00:00:00:00"></label>
     </div>
+    <div class="bar" style="margin-top:4px"><button type="button" id="btnFpsAuto" class="small"><i data-ic="refresh"></i>從影片自動偵測</button>
+      <span class="small muted">手動改過的影片不會再自動覆蓋；按這裡可以重新偵測。</span></div>
     <label>審片人（會寫進修改表）</label>
     <input id="setReviewer" type="text" placeholder="例如：阿湯">
     <label>語音辨識引擎</label>
@@ -813,6 +815,7 @@
   function loadVideo(file) {
     video.removeAttribute('crossorigin'); $('#srcHint').textContent = '';
     video.src = URL.createObjectURL(file);
+    probeSrc = file;
     openProject(file.name, `vrn.notes.${file.name}.${file.size}`);
   }
   // Share links -> direct media links. Dropbox streams well (supports range requests);
@@ -846,6 +849,7 @@
     const cleanup = () => { video.removeEventListener('loadeddata', ok); video.removeEventListener('error', fail); };
     video.addEventListener('loadeddata', ok); video.addEventListener('error', fail);
     video.crossOrigin = 'anonymous'; video.src = src;
+    probeSrc = src;
     const u = new URL(src);
     name ||= decodeURIComponent(u.pathname.split('/').pop() || '') || u.hostname;
     u.searchParams.delete('key'); // never part of the storage key
@@ -892,7 +896,7 @@
     try {
       const j = await api.req(`/videos/${encodeURIComponent(id)}`);
       video.removeAttribute('crossorigin'); $('#srcHint').textContent = '';
-      video.src = api.media(id);
+      video.src = probeSrc = api.media(id);
       openProject(j.name || name, null, { id, info: j.info, notes: j.notes });
       $('#urlHint').textContent = '';
     } catch (err) { $('#urlHint').textContent = '打不開這支影片：' + err.message; }
@@ -944,18 +948,22 @@
   function openProject(name, key, remote) {
     videoName = name; videoKey = key || '';
     project = { remote: remote?.id || null, info: remote?.info || null };
-    const saved = remote ? { notes: remote.notes, fps: remote.info?.fps, startTc: remote.info?.startTc } : store.get(videoKey, null);
+    const saved = remote ? { notes: remote.notes, fps: remote.info?.fps, startTc: remote.info?.startTc,
+      fpsSource: remote.info?.fpsSource, startTcSource: remote.info?.startTcSource } : store.get(videoKey, null);
     notes = saved?.notes || [];
-    if (saved?.fps) $('#fps').value = saved.fps;
-    if (saved?.startTc) $('#startTc').value = saved.startTc;
+    $('#fps').value = saved?.fps || '29.97';
+    $('#startTc').value = saved?.startTc || '00:00:00:00';
+    // older local saves have no source: a non-default value there was set by hand
+    fpsMeta = { fps: saved?.fpsSource || (saved?.fps && saved.fps !== '29.97' ? 'manual' : 'default'),
+      tc: saved?.startTcSource || (saved?.startTc && saved.startTc !== '00:00:00:00' ? 'manual' : 'default'), vfr: false, key: videoKey || remote?.id };
     $('#loader').hidden = true; $('#playerWrap').hidden = false;
     $('#srcName').textContent = name;
-    $('#fpsBadge').textContent = $('#fps').value + 'fps';
+    fpsBadge();
     document.title = `${videoName} – 片語`;
     $('#btnShare').hidden = !(api.mode === 'owner' && project.remote);
     notes.sort(byTime); activeId = null;
     marks.in = marks.out = null; loop = null; replyOpen = null; setCompare(null);
-    render(); renderStatus(); drawMarks(); syncLoop(); loadVersions();
+    render(); renderStatus(); drawMarks(); syncLoop(); loadVersions(); autoFps();
   }
   $('#urlForm').onsubmit = e => { e.preventDefault(); if ($('#videoUrl').value.trim()) loadUrl($('#videoUrl').value); };
   $('#btnChange').onclick = () => {
@@ -966,11 +974,165 @@
     render(); renderStatus(); listDrive();
   };
   $('#fpsBadge').onclick = () => openSettings();
-  const save = () => !project.remote && videoKey && store.set(videoKey, { name: videoName, notes, fps: $('#fps').value, startTc: $('#startTc').value });
-  $('#fps').onchange = $('#startTc').onchange = () => {
+  const save = () => !project.remote && videoKey && store.set(videoKey, { name: videoName, notes, fps: $('#fps').value, startTc: $('#startTc').value,
+    fpsSource: fpsMeta.fps, startTcSource: fpsMeta.tc });
+  // set by hand: never overridden by detection again (until 從影片自動偵測)
+  $('#fps').onchange = () => { fpsMeta.fps = 'manual'; timingChanged({ fps: $('#fps').value }); };
+  $('#startTc').onchange = () => { fpsMeta.tc = 'manual'; timingChanged({ startTc: $('#startTc').value }); };
+  function timingChanged(patch, auto = false) {
     if (project.remote && api.mode === 'owner')
-      api.req(`/videos/${encodeURIComponent(project.remote)}`, { method: 'PATCH', json: { fps: $('#fps').value, startTc: $('#startTc').value } }).catch(err => toast(err.message));
-    save(); render(); updateTc(); $('#fpsBadge').textContent = $('#fps').value + 'fps';
+      api.req(`/videos/${encodeURIComponent(project.remote)}`, { method: 'PATCH', json: { ...patch, auto } })
+        .then(r => { project.info = r.info; }).catch(err => toast(err.message));
+    // frame numbers follow the new rate; the seconds stored with each note are the truth
+    for (const n of notes) {
+      if (n.general || n.t == null) continue;
+      const f = frameOf(n.t), f2 = n.t2 != null ? frameOf(n.t2) : null;
+      if (f === n.frame && f2 === (n.frame2 ?? null)) continue;
+      n.frame = f; if (f2 != null) n.frame2 = f2;
+      if (project.remote) persist(n);
+    }
+    save(); render(); updateTc(); fpsBadge(); drawMarks();
+  }
+  function fpsBadge() {
+    const how = { auto: '自動', measured: '自動（量測）', manual: '手動' }[fpsMeta.fps] || '預設';
+    $('#fpsBadge').textContent = $('#fps').value + 'fps' + (fpsMeta.fps === 'auto' || fpsMeta.fps === 'measured' ? '・自動' : '');
+    $('#fpsBadge').title = `幀率：${how}${fpsMeta.vfr ? '（可變幀率）' : ''}・起始時間碼 ${$('#startTc').value}（${{ auto: '從影片讀取', manual: '手動' }[fpsMeta.tc] || '預設'}）。點一下可以修改`;
+    $('#fpsHow').textContent = `　${how}${fpsMeta.vfr ? '・可變幀率' : ''}`;
+  }
+
+  // ---------- frame rate and start timecode, read from the file itself ----------
+  // mp4 / mov: the video track's sample durations (moov › trak › mdia › minf › stbl › stts) give the exact rate,
+  // and a QuickTime timecode track (tmcd), when there is one, gives the start timecode.
+  // Anything else (webm, a server without range requests): measured from the first seconds of playback.
+  let probeSrc = null, fpsMeta = { fps: 'default', tc: 'default', vfr: false, key: null };
+  async function readBytes(src, start, len) {
+    try {
+      if (src instanceof Blob) return new DataView(await src.slice(start, start + len).arrayBuffer());
+      const r = await fetch(src, { headers: { Range: `bytes=${start}-${start + len - 1}` }, credentials: 'same-origin' });
+      if (r.status !== 206) { r.body?.cancel(); return null; } // no range support: don't download the whole file
+      return new DataView(await r.arrayBuffer());
+    } catch { return null; }
+  }
+  const fourcc = (dv, o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
+  function* boxes(dv, start = 0, end = dv.byteLength) {
+    for (let o = start; o + 8 <= end;) {
+      let size = dv.getUint32(o), head = 8;
+      if (size === 1) { size = Number(dv.getBigUint64(o + 8)); head = 16; } else if (size === 0) size = end - o;
+      if (size < head) return;
+      yield { type: fourcc(dv, o + 4), start: o + head, end: Math.min(o + size, end) };
+      o += size;
+    }
+  }
+  const child = (dv, b, type) => { for (const c of boxes(dv, b.start, b.end)) if (c.type === type) return c; return null; };
+  const boxPath = (dv, b, ...types) => types.reduce((x, t) => x && child(dv, x, t), b);
+  async function probeTiming(src) {
+    let moov = null;
+    for (let off = 0, i = 0; i < 16; i++) { // walk the top-level boxes (ftyp, mdat, moov…) with small reads
+      const h = await readBytes(src, off, 16);
+      if (!h || h.byteLength < 8) return null;
+      let size = h.getUint32(0);
+      if (size === 1) size = Number(h.getBigUint64(8)); else if (size === 0) return null;
+      const type = fourcc(h, 4);
+      if (i === 0 && !['ftyp', 'moov', 'wide', 'free', 'mdat', 'skip'].includes(type)) return null; // not mp4 / mov
+      if (type === 'moov') { if (size > 64e6) return null; moov = await readBytes(src, off, size); break; }
+      off += size;
+    }
+    if (!moov) return null;
+    const out = {};
+    for (const trak of boxes(moov, 8)) {
+      if (trak.type !== 'trak') continue;
+      const mdia = child(moov, trak, 'mdia'), hdlr = mdia && child(moov, mdia, 'hdlr'), mdhd = mdia && child(moov, mdia, 'mdhd');
+      if (!hdlr || !mdhd) continue;
+      const kind = fourcc(moov, hdlr.start + 8), timescale = moov.getUint32(mdhd.start + (moov.getUint8(mdhd.start) === 1 ? 20 : 12));
+      const stbl = boxPath(moov, mdia, 'minf', 'stbl');
+      if (!stbl || !timescale) continue;
+      if (kind === 'vide' && !out.fps) {
+        const stts = child(moov, stbl, 'stts');
+        if (!stts) continue;
+        const n = moov.getUint32(stts.start + 4), runs = [];
+        for (let i = 0; i < n && stts.start + 16 + i * 8 <= stts.end; i++) runs.push([moov.getUint32(stts.start + 8 + i * 8), moov.getUint32(stts.start + 12 + i * 8)]);
+        const total = runs.reduce((a, [c]) => a + c, 0);
+        if (!total) continue;
+        const [, delta] = runs.reduce((a, r) => r[0] > a[0] ? r : a); // the most common frame duration
+        out.fps = timescale / delta;
+        // variable frame rate: a real share of the frames has a different duration (a short last frame doesn't count)
+        out.vfr = runs.filter(([, d]) => Math.abs(d - delta) / delta > 0.02).reduce((a, [c]) => a + c, 0) > total * 0.05;
+      }
+      if (kind === 'tmcd' && !out.startTc) {
+        const stsd = child(moov, stbl, 'stsd'), stco = child(moov, stbl, 'stco') || child(moov, stbl, 'co64');
+        if (!stsd || !stco) continue;
+        const e = stsd.start + 8; // first sample entry: size, 'tmcd', reserved(6), dref(2), reserved(4), flags, timescale, frameDuration, frames
+        if (fourcc(moov, e + 4) !== 'tmcd') continue;
+        const drop = moov.getUint32(e + 20) & 1, base = moov.getUint8(e + 32);
+        const at = stco.type === 'co64' ? Number(moov.getBigUint64(stco.start + 8)) : moov.getUint32(stco.start + 8);
+        const v = await readBytes(src, at, 4);
+        if (v && base) out.startTc = framesToTc(v.getUint32(0), base, !!drop);
+      }
+    }
+    return out.fps || out.startTc ? out : null;
+  }
+  function framesToTc(f, base, drop) {
+    if (drop) { // drop-frame count → the label the camera / Premiere shows (29.97 / 59.94 DF)
+      const d = Math.round(base / 15), per10 = base * 600 - d * 9, per1 = base * 60 - d, tens = Math.floor(f / per10), rest = f % per10;
+      f += d * 9 * tens + (rest > d ? d * Math.floor((rest - d) / per1) : 0);
+    }
+    const p = n => String(n).padStart(2, '0');
+    return `${p(Math.floor(f / (base * 3600)) % 24)}:${p(Math.floor(f / (base * 60)) % 60)}:${p(Math.floor(f / base) % 60)}:${p(f % base)}`;
+  }
+  function snapFps(f) { // nearest choice in the FPS list, if it's really that rate
+    let best = null, err = 1;
+    for (const [k, [r]] of Object.entries(FPS)) { const e = Math.abs(r - f) / r; if (e < err) { err = e; best = k; } }
+    return err < 0.006 ? best : null;
+  }
+  // playback fallback: frame-to-frame media times during the first normal-speed seconds of playback
+  function measureFps(key) {
+    if (!video.requestVideoFrameCallback) return;
+    const deltas = [];
+    let last = null;
+    const cb = (now, md) => {
+      if (fpsMeta.key !== key || fpsMeta.fps !== 'default') return;
+      if (!video.paused && video.playbackRate === 1 && !video.seeking) {
+        if (last != null) { const d = md.mediaTime - last; if (d > 0.004 && d < 0.5) deltas.push(d); }
+        last = md.mediaTime;
+      } else last = null;
+      if (deltas.length < 20) { video.requestVideoFrameCallback(cb); return; }
+      // a slow screen skips frames, so gaps are whole multiples of one frame: the shortest gap is one frame
+      const d0 = Math.min(...deltas), fit = deltas.filter(d => Math.abs(d / d0 - Math.round(d / d0)) < 0.1);
+      if (fit.length < deltas.length * 0.8) return; // irregular: leave it to the user
+      const k = snapFps(fit.length / fit.reduce((a, d) => a + d / Math.round(d / d0), 0));
+      if (k) applyTiming({ fps: k }, 'measured');
+    };
+    video.requestVideoFrameCallback(cb);
+  }
+  function applyTiming(found, how) {
+    const patch = {};
+    if (found.fps && fpsMeta.fps !== 'manual') {
+      fpsMeta.fps = how; fpsMeta.vfr = !!found.vfr;
+      if (found.fps !== $('#fps').value) { $('#fps').value = found.fps; patch.fps = found.fps; }
+    }
+    if (found.startTc && fpsMeta.tc !== 'manual') {
+      fpsMeta.tc = 'auto';
+      if (found.startTc !== $('#startTc').value) { $('#startTc').value = found.startTc; patch.startTc = found.startTc; }
+    }
+    if (Object.keys(patch).length) timingChanged(patch, true); else { save(); fpsBadge(); }
+    if (found.vfr) toast('這支影片是可變幀率（常見於手機直接拍的影片），時間碼可能差幾格。建議轉成固定幀率的審片檔。');
+    return patch;
+  }
+  async function autoFps(force = false) {
+    const key = fpsMeta.key, src = probeSrc;
+    if (!src || (!force && fpsMeta.fps === 'manual' && fpsMeta.tc === 'manual')) return null;
+    const r = await probeTiming(src).catch(() => null);
+    if (fpsMeta.key !== key) return null; // another video was opened meanwhile
+    const fps = r?.fps && snapFps(r.fps);
+    if (fps || r?.startTc) return { found: { fps, vfr: r.vfr, startTc: r.startTc }, patch: applyTiming({ fps, vfr: r.vfr, startTc: r.startTc }, 'auto') };
+    if (fpsMeta.fps === 'default') measureFps(key);
+    return null;
+  }
+  $('#btnFpsAuto').onclick = async () => {
+    fpsMeta.fps = fpsMeta.tc = 'default';
+    const r = await autoFps(true);
+    toast(r?.found.fps ? `偵測到 ${r.found.fps} fps${r.found.startTc ? '，起始時間碼 ' + r.found.startTc : ''}` : '讀不到檔頭，播放幾秒後會自動量測幀率');
+    fpsBadge();
   };
 
   // ---------- touch transport ----------
@@ -1021,7 +1183,7 @@
   video.addEventListener('seeked', updateTc);
   video.addEventListener('loadedmetadata', () => {
     document.body.classList.toggle('portrait', video.videoHeight > video.videoWidth);
-    render(); updateTc(); refreshPt();
+    syncSafeOptions(); render(); updateTc(); refreshPt(); drawMarks();
   });
   (function tick() {
     if (!video.paused) {
@@ -1145,23 +1307,38 @@
     marksChanged();
   };
 
-  // safe-zone guides: where the platform's buttons and captions cover a vertical video (approximate, for reference)
+  // safe-zone guides. Vertical platforms: where their buttons and captions cover the picture (approximate, for reference).
+  // 動作 93%／字幕 90%: the broadcast pair (EBU R 95 / SMPTE ST 2046-1), for any aspect ratio.
   const SAFE = {
-    reels: { label: 'IG Reels', t: 0.13, b: 0.25, l: 0.06, r: 0.12 },
-    tiktok: { label: 'TikTok', t: 0.08, b: 0.25, l: 0.06, r: 0.13 },
-    shorts: { label: 'YouTube Shorts', t: 0.1, b: 0.22, l: 0.06, r: 0.14 },
-    title: { label: '字幕安全', t: 0.05, b: 0.05, l: 0.05, r: 0.05 },
+    reels: { label: 'IG Reels', vertical: true, t: 0.13, b: 0.25, l: 0.06, r: 0.12 },
+    tiktok: { label: 'TikTok', vertical: true, t: 0.08, b: 0.25, l: 0.06, r: 0.13 },
+    shorts: { label: 'YouTube Shorts', vertical: true, t: 0.1, b: 0.22, l: 0.06, r: 0.14 },
+    title: { frames: [['動作安全 93%', 0.035], ['字幕安全 90%', 0.05]] },
   };
   let safeMode = store.get('vrn.safe', 'off');
   $('#safeSel').value = SAFE[safeMode] ? safeMode : 'off';
   $('#safeSel').onchange = () => { safeMode = $('#safeSel').value; store.set('vrn.safe', safeMode); showSafe(); };
+  const isVertical = () => video.videoHeight > video.videoWidth;
+  function syncSafeOptions() { // platform guides only make sense on a vertical video
+    $('#safeSel').querySelectorAll('[data-v]').forEach(o => { o.hidden = o.disabled = !isVertical(); });
+    $('#safeSel').value = SAFE[safeMode] && !(SAFE[safeMode].vertical && !isVertical()) ? safeMode : 'off';
+  }
   function showSafe() {
     const svg = $('#safe'), z = SAFE[safeMode];
-    if (!z || !video.videoWidth || $('#playerWrap').hidden) { svg.toggleAttribute('hidden', true); return; }
-    const c = overlay(svg), x = z.l * c.w, y = z.t * c.h, w = c.w * (1 - z.l - z.r), h = c.h * (1 - z.t - z.b);
-    svg.innerHTML = `<path fill="rgba(10,8,30,.42)" fill-rule="evenodd" d="M0 0H${c.w}V${c.h}H0Z M${x} ${y}h${w}v${h}h${-w}Z"/>
-      <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="6 5" opacity=".9"/>
-      <text x="${x + 8}" y="${y + 18}" fill="#fff">${z.label} 安全範圍（參考）</text>`;
+    if (!z || !video.videoWidth || $('#playerWrap').hidden || (z.vertical && !isVertical())) { svg.toggleAttribute('hidden', true); return; }
+    const c = overlay(svg);
+    if (z.frames) {
+      svg.innerHTML = z.frames.map(([name, m], i) => {
+        const x = m * c.w, y = m * c.h, w = c.w * (1 - 2 * m), h = c.h * (1 - 2 * m);
+        return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#fff" stroke-width="1.2" ${i ? 'stroke-dasharray="6 5"' : ''} opacity=".85"/>
+          <text x="${i ? x + 6 : x + w - 6}" y="${y + 15}" text-anchor="${i ? 'start' : 'end'}" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width="3" paint-order="stroke">${name}</text>`;
+      }).join('');
+    } else {
+      const x = z.l * c.w, y = z.t * c.h, w = c.w * (1 - z.l - z.r), h = c.h * (1 - z.t - z.b);
+      svg.innerHTML = `<path fill="rgba(10,8,30,.42)" fill-rule="evenodd" d="M0 0H${c.w}V${c.h}H0Z M${x} ${y}h${w}v${h}h${-w}Z"/>
+        <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="6 5" opacity=".9"/>
+        <text x="${x + 8}" y="${y + 18}" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width="3" paint-order="stroke">${z.label} 安全範圍（參考）</text>`;
+    }
     svg.toggleAttribute('hidden', false);
   }
   video.addEventListener('play', () => { showPt(null); showShapes(null); });
@@ -2476,7 +2653,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     Object.assign(settings, { reviewer: info.name, cats: info.config.cats, autoPolish: info.config.autoPolish, engine: 'elevenlabs' });
     api.limit = info.limit;
     $('#who').textContent = `${info.name}・審片`;
-    video.src = api.media(info.video.id);
+    video.src = probeSrc = api.media(info.video.id);
     openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: info.notes });
     setInterval(syncNotes, 20e3);
     maybeTour();

@@ -61,8 +61,9 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
     }
     if (method === 'PATCH') {
       const input = await body(request), patch = {};
-      if (input.fps) patch.fps = String(input.fps).slice(0, 10);
-      if (input.startTc) patch.startTc = String(input.startTc).slice(0, 12);
+      // auto: detected from the file; otherwise the owner set it by hand
+      if (input.fps) Object.assign(patch, { fps: String(input.fps).slice(0, 10), fpsAuto: !!input.auto });
+      if (input.startTc) Object.assign(patch, { startTc: String(input.startTc).slice(0, 12), startTcAuto: !!input.auto });
       if (input.status in STATUSES) Object.assign(patch, { status: input.status, statusBy: '你', statusAt: Date.now() });
       return json({ info: await patchVideo(d, id, patch) });
     }
