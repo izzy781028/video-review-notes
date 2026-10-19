@@ -495,7 +495,6 @@
           <div style="flex:1; min-width:0">
             <div class="bar" style="margin-top:0">
               <strong id="edTc" class="mono"></strong><span id="edRange" class="mono small"></span>
-              <select id="edCat" aria-label="類別"></select>
               <label class="small toggle"><input type="checkbox" id="edGeneral"> 整體意見</label>
             </div>
             <div id="toolsRow" class="bar tools">
@@ -550,7 +549,7 @@
         <button data-f="all">全部</button><button data-f="open">待處理</button>
         <button data-f="client" class="ownerOnly">客戶</button><button data-f="mine" class="ownerOnly">我的</button>
       </span>
-      <input id="search" type="search" placeholder="搜尋意見、名字、類別" aria-label="搜尋意見">
+      <input id="search" type="search" placeholder="搜尋意見、名字" aria-label="搜尋意見">
     </div>
     <div id="list" class="listBody"><div class="muted small">還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。</div></div>
   </section>
@@ -605,10 +604,8 @@
       <input id="setGKey" type="password" placeholder="AIza..." autocomplete="off">
       <p class="small muted" style="margin:4px 0 0">資料夾要設成「知道連結的任何人都能檢視」。設定方式見 README。</p>
     </div>
-    <label>修改類別（逗號分隔）</label>
-    <input id="setCats" type="text">
     <p class="small muted localOnly">API Key 只存在這台電腦的瀏覽器裡，錄音會直接送到你選的辨識服務。</p>
-    <p class="small muted serverOnly">API Key 都存在伺服器上。專有名詞、類別、AI 設定會套用到你所有裝置和分享出去的連結。</p>
+    <p class="small muted serverOnly">API Key 都存在伺服器上。專有名詞和 AI 設定會套用到你所有裝置和分享出去的連結。</p>
     <div class="bar"><span class="spacer" style="flex:1"></span><button value="ok" class="primary">完成</button></div>
   </form>
 </dialog>
@@ -722,14 +719,13 @@
   const FPS = { '23.976': [24000/1001, 24, true], '24': [24, 24, false], '25': [25, 25, false],
     '29.97': [30000/1001, 30, true], '30': [30, 30, false], '50': [50, 50, false],
     '59.94': [60000/1001, 60, true], '60': [60, 60, false] };
-  const DEFAULT_CATS = '剪接,字幕,字卡/圖像,調色,音效/音樂,旁白,畫面/特效,其他';
 
   // ---------- storage (always guarded) ----------
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
-  const settings = Object.assign({ reviewer: '', engine: 'elevenlabs', elKey: '', oaKey: '', terms: '', cats: DEFAULT_CATS,
+  const settings = Object.assign({ reviewer: '', engine: 'elevenlabs', elKey: '', oaKey: '', terms: '',
     anKey: '', polishModel: 'claude-opus-5-5', autoPolish: true, polishImage: true, driveFolder: '', gKey: '' },
     store.get('vrn.settings', {}));
 
@@ -1373,7 +1369,6 @@
   }
 
   // ---------- editor ----------
-  const cats = () => settings.cats.split(/[,，]/).map(s => s.trim()).filter(Boolean);
   // a general note (整體意見) has no timecode: t / frame are null
   const tcRange = n => n.frame2 != null ? `${tcOfFrame(n.frame)} → ${tcOfFrame(n.frame2)}` : tcOfFrame(n.frame);
   const label = n => n.general ? '整體意見' : tcRange(n);
@@ -1411,7 +1406,7 @@
     // edit a copy: Cancel leaves the note untouched
     editing = note ? { ...note, pt: note.pt && { ...note.pt }, shapes: note.shapes?.map(sh => ({ ...sh, pts: sh.pts.map(p => p.slice()) })) }
       : { id: crypto.randomUUID?.() || String(Date.now()), t: video.currentTime, frame: frameOf(video.currentTime),
-        text: '', cat: cats()[0] || '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
+        text: '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
     if (ranged) { // I / O marks: the note covers that range; its picture is the first frame
       const fps = fpsInfo()[0];
       Object.assign(editing, { frame: marks.in, t: (marks.in + 0.5) / fps, thumb: '' });
@@ -1421,7 +1416,6 @@
       video.addEventListener('seeked', () => { if (editing === target && !target.thumb) { target.thumb = grabThumb(target); syncGeneral(); } }, { once: true });
       seekFrame(target.frame);
     }
-    $('#edCat').innerHTML = cats().map(c => `<option${c === editing.cat ? ' selected' : ''}>${esc(c)}</option>`).join('');
     $('#edGeneral').checked = general || !!editing.general;
     syncGeneral();
     $('#edText').value = editing.text;
@@ -1461,7 +1455,7 @@
     if (!editing) return;
     const text = $('#edText').value.trim();
     if (!text) { closeEditor(); return; }
-    editing.text = text; editing.cat = $('#edCat').value;
+    editing.text = text;
     if (editing.raw === text) delete editing.raw;
     if ($('#edGeneral').checked) {
       Object.assign(editing, { general: true, t: null, frame: null, t2: null, frame2: null, thumb: '', pt: null, shapes: null });
@@ -1642,7 +1636,7 @@
     if (input !== lastPolished || !target.raw) target.raw = input;
     const general = $('#edGeneral').checked;
     const ctx = [`影片：${videoName}`, `位置：${general ? '整體意見（不指定時間碼）' : '時間碼 ' + $('#edTc').textContent}`,
-      `類別：${$('#edCat').value}`, terms().length ? `常用詞：${terms().join('、')}` : ''].filter(Boolean).join('\n');
+      terms().length ? `常用詞：${terms().join('、')}` : ''].filter(Boolean).join('\n');
     const content = [];
     const img = !general && (server() || settings.polishImage) && $('#edThumb').src.startsWith('data:image/jpeg') ? $('#edThumb').src : '';
     if (img) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: img.split(',')[1] } });
@@ -1652,7 +1646,7 @@
     try {
       let out;
       if (server()) {
-        out = (await api.req('/polish', { method: 'POST', json: { raw: target.raw, videoName, tc: $('#edTc').textContent, cat: $('#edCat').value, general, image: img } })).text;
+        out = (await api.req('/polish', { method: 'POST', json: { raw: target.raw, videoName, tc: $('#edTc').textContent, general, image: img } })).text;
       } else {
       const client = await claudeClient();
       const model = settings.polishModel;
@@ -1896,9 +1890,9 @@
     a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-  const rows = () => notes.map((n, i) => [i + 1, label(n), n.general ? '' : n.t.toFixed(3), n.cat, n.text, n.done ? '已修改' : '待修改', n.by || '', n.raw || '']);
+  const rows = () => notes.map((n, i) => [i + 1, label(n), n.general ? '' : n.t.toFixed(3), n.text, n.done ? '已修改' : '待修改', n.by || '', n.raw || '']);
   const timedNotes = () => notes.filter(n => !n.general);
-  const HEAD = ['編號', '時間碼', '秒數', '類別', '修改內容', '狀態', '審片人', '原始口述'];
+  const HEAD = ['編號', '時間碼', '秒數', '修改內容', '狀態', '審片人', '原始口述'];
   const need = () => notes.length || (alert('還沒有任何意見'), false);
 
   $('#btnCsv').onclick = () => {
@@ -1919,7 +1913,7 @@
     if (!timed.length) return alert('沒有指定時間碼的意見');
     const srt = timed.map((n, i) => {
       const end = n.t2 != null ? n.t2 : Math.min(n.t + 3, timed[i + 1] ? timed[i + 1].t : Infinity, video.duration || Infinity);
-      return `${i + 1}\n${srtTime(n.t)} --> ${srtTime(Math.max(end, n.t + 0.5))}\n#${notes.indexOf(n) + 1} [${n.cat}] ${n.text}\n`;
+      return `${i + 1}\n${srtTime(n.t)} --> ${srtTime(Math.max(end, n.t + 0.5))}\n#${notes.indexOf(n) + 1}${n.cat ? ` [${n.cat}]` : ''} ${n.text}\n`;
     }).join('\n');
     download(base() + '.srt', srt, 'text/plain;charset=utf-8');
   };
@@ -1951,7 +1945,7 @@
     const rate = `<rate><timebase>${tb}</timebase><ntsc>${ntsc ? 'TRUE' : 'FALSE'}</ntsc></rate>`;
     const w = video.videoWidth || 1920, h = video.videoHeight || 1080;
     const markers = timed.map(n =>
-      `<marker><name>${x(`#${notes.indexOf(n) + 1} ${n.cat}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${n.frame}</in><out>${n.frame2 ?? -1}</out></marker>`).join('\n      ');
+      `<marker><name>${x(`#${notes.indexOf(n) + 1}${n.cat ? ' ' + n.cat : ''}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${n.frame}</in><out>${n.frame2 ?? -1}</out></marker>`).join('\n      ');
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE xmeml>
 <xmeml version="4">
@@ -2241,7 +2235,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   function openSettings() {
     $('#setReviewer').value = settings.reviewer; $('#setEngine').value = settings.engine;
     $('#setElKey').value = settings.elKey; $('#setOaKey').value = settings.oaKey;
-    $('#setTerms').value = settings.terms; $('#setCats').value = settings.cats;
+    $('#setTerms').value = settings.terms;
     $('#setDriveFolder').value = settings.driveFolder; $('#setGKey').value = settings.gKey;
     $('#setAnKey').value = settings.anKey; $('#setPolishModel').value = settings.polishModel;
     $('#setAutoPolish').checked = settings.autoPolish; $('#setPolishImage').checked = settings.polishImage;
@@ -2251,7 +2245,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   $('#settings').addEventListener('close', () => {
     Object.assign(settings, { reviewer: $('#setReviewer').value.trim(), engine: $('#setEngine').value,
       elKey: $('#setElKey').value.trim(), oaKey: $('#setOaKey').value.trim(), terms: $('#setTerms').value,
-      cats: $('#setCats').value.trim() || DEFAULT_CATS, anKey: $('#setAnKey').value.trim(),
+      anKey: $('#setAnKey').value.trim(),
       polishModel: $('#setPolishModel').value, autoPolish: $('#setAutoPolish').checked, polishImage: $('#setPolishImage').checked,
       driveFolder: $('#setDriveFolder').value.trim(), gKey: $('#setGKey').value.trim() });
     store.set('vrn.settings', settings);
@@ -2526,7 +2520,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       let out;
       if (server()) out = (await api.req('/summary', { method: 'POST', json: { videoName, items } })).summary;
       else {
-        const line = i => `#${i.no}｜${i.tc}｜來源：${i.source}｜${i.cat}\n${i.text}` + (i.decision ? `\n（剪接師的決定：${i.decision}）` : '');
+        const line = i => `#${i.no}｜${i.tc}｜來源：${i.source}${i.cat ? '｜' + i.cat : ''}\n${i.text}` + (i.decision ? `\n（剪接師的決定：${i.decision}）` : '');
         const model = settings.polishModel;
         const msg = await (await claudeClient()).beta.messages.create({
           model, max_tokens: 16000,
@@ -2626,7 +2620,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   themeIcon();
 
   // ---------- start ----------
-  const CONFIG_KEYS = ['reviewer', 'terms', 'cats', 'polishModel', 'autoPolish', 'polishImage'];
+  const CONFIG_KEYS = ['reviewer', 'terms', 'polishModel', 'autoPolish', 'polishImage'];
   const pickConfig = c => Object.fromEntries(CONFIG_KEYS.filter(k => k in c).map(k => [k, c[k]]));
 
   function showGate(msg, askPin) {
@@ -2650,7 +2644,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     try { info = await api.req('/info'); }
     catch (err) { return showGate(err.message, err.data?.code === 'pin'); }
     $('#gate').hidden = true; document.querySelector('main').hidden = false;
-    Object.assign(settings, { reviewer: info.name, cats: info.config.cats, autoPolish: info.config.autoPolish, engine: 'elevenlabs' });
+    Object.assign(settings, { reviewer: info.name, autoPolish: info.config.autoPolish, engine: 'elevenlabs' });
     api.limit = info.limit;
     $('#who').textContent = `${info.name}・審片`;
     video.src = probeSrc = api.media(info.video.id);

@@ -128,7 +128,8 @@ def print_note(n, fps, start, show_new=False):
     if n.get('shapes'):
         pt += '（畫面上有' + '、'.join(dict.fromkeys(SHAPES.get(s.get('type'), '標記') for s in n['shapes'])) + '，用 shot 看截圖）'
     who = f"客戶：{n.get('by') or '外部審片'}" if is_client(n) else '你'
-    print(f"  - {mark}[{timecode(n, fps, start)}] [{n.get('cat', '')}] {who}{pt}  id={n['id']}")
+    cat = f"[{n['cat']}] " if n.get('cat') else ''  # older notes may still have a category
+    print(f"  - {mark}[{timecode(n, fps, start)}] {cat}{who}{pt}  id={n['id']}")
     for line in str(n.get('text', '')).splitlines():
         print(f'      {line}')
     if n.get('raw') and n['raw'] != n.get('text'):

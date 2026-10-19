@@ -28,7 +28,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
     return withCookies(json({
       role: 'guest', name: share.label, expires: share.expires,
       video: { id: share.video, name: meta.name }, info: await getVideo(d, share.video),
-      config: { cats: config.cats, autoPolish: config.autoPolish, polishImage: config.polishImage },
+      config: { autoPolish: config.autoPolish, polishImage: config.polishImage },
       limit: dailyLimit(env), used: await usedToday(d, share.id),
       notes: forGuest(await listNotes(d, share.video, me.author)),
     }));
