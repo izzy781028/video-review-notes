@@ -1521,7 +1521,7 @@
           transcribe(new Blob(this.chunks, { type: this.mr.mimeType || 'audio/webm' }));
         };
         this.discard = false; this.mr.start(); this.active = true; this.startedAt = Date.now(); recUi(true);
-        status(this.hold ? '錄音中… 放開就停止' : '錄音中… 講完按「停止」或再按 V');
+        status(this.hold ? '錄音中… 放開就停止' : '錄音中… 講完按空白鍵、V 或「停止」');
         if (this.holdStop) this.stop();
       }).catch(err => status('無法使用麥克風：' + err.message));
     },
@@ -1542,7 +1542,7 @@
       sr.onerror = e => status('辨識錯誤：' + e.error);
       sr.onend = () => { if (this.active) { this.active = false; recUi(false); status('辨識完成，可以直接修改文字再儲存。'); $('#edText').focus(); afterSpeech(); } };
       sr.start(); this.active = true; this.startedAt = Date.now(); recUi(true);
-      status(this.hold ? '聆聽中… 放開就停止' : '聆聽中…（即時辨識）講完按「停止」或再按 V');
+      status(this.hold ? '聆聽中… 放開就停止' : '聆聽中…（即時辨識）講完按空白鍵、V 或「停止」');
       if (this.holdStop) this.stop();
     },
     stop(discard = false) {
@@ -1614,7 +1614,7 @@
 - 使用繁體中文（台灣用語）。英文術語、品牌名、專有名詞保留原文，例如 Logo、B-roll、Super、CTA、Fade in。
 - 去掉口頭禪、重複與語助詞，修正明顯的語音辨識錯字（可參考提供的常用詞）。
 - 寫清楚「改哪裡、改成什麼、怎麼改」。只有一件事就寫一兩句；有多件事就分點，每點以「1. 」「2. 」開頭。
-- 只根據原話整理，不要加入原話沒有的要求、數值或創意。原話不清楚、需要跟審片人確認的地方，在句末標註【待確認：要確認的內容】。
+- 只根據原話整理，不要加入原話沒有的要求、數值或創意。原話沒講清楚的地方（例如沒說要改成多少），就照原話的程度寫，不要自己補上，也不要加註、提問或標記待確認。
 - 如果附了截圖，只用來把原話裡「這裡、這個、那個字」對應到畫面上的具體元素（位置、顏色、文字內容），不要根據截圖自己提出新的修改。
 - 只輸出整理後的修改指示本身，不要前言、標題或說明。`;
   let anthropic = null, lastPolished = null;
@@ -1661,7 +1661,7 @@
       if (msg.stop_reason === 'refusal') throw new Error('模型拒絕處理這段內容');
       out = msg.content.filter(b => b.type === 'text').map(b => b.text).join('');
       }
-      out = tw(out.trim());
+      out = tw(out.replace(/[ \t]*【待確認[^】]*】/g, '').trim()); // no 【待確認…】 notes
       if (!out) throw new Error('沒有回傳內容');
       if (editing !== target) return;
       $('#edText').value = lastPolished = out;
@@ -1860,6 +1860,12 @@
   document.addEventListener('keyup', e => { if (e.key === ' ' && video.src && !isTyping(e) && !$('#settings').open) e.preventDefault(); }, true);
   document.addEventListener('keydown', e => {
     const typing = isTyping(e);
+    // while recording, Space ends the recording (like a voice memo) and never starts the video
+    if (rec.active && e.key === ' ' && (!typing || e.target.id === 'edText')) {
+      e.preventDefault(); e.stopPropagation();
+      if (!e.repeat) rec.stop();
+      return;
+    }
     if (editing && e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
     if (editing && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); return; }
     if (typing || $('#settings').open || !video.src) return;
@@ -2501,7 +2507,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
 - todo：合併成具體的待辦事項，依影片時間順序排列。意思相同的意見合併成一項，refs 列出所有相關編號。detail 寫清楚改哪裡、改成什麼。priority：會影響播出或客戶明確要求的是 high，一般修改是 normal，可有可無的是 low。
 - duplicates：內容重複或幾乎相同的意見（至少兩則）。
 - conflicts：互相矛盾的要求，例如一則說加快、一則說放慢；特別注意客戶和「你」之間的矛盾。note 說明衝突在哪裡。
-- questions：內容不清楚、需要先確認才能動手的地方，包含原文標了【待確認】的。
+- questions：內容不清楚、需要先確認才能動手的地方（例如只說「調一下」沒說調多少）。
 - summary：一兩句話說明整體狀況。
 只根據提供的意見整理，不要加入新的修改建議。使用繁體中文（台灣用語），英文術語保留原文。沒有的項目給空陣列。`;
   const REFS = { type: 'array', items: { type: 'integer' } };
