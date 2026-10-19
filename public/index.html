@@ -1851,8 +1851,15 @@
   video.addEventListener('ended', stopShuttle);
 
   // ---------- keyboard ----------
+  // Clicking the video's own controls (or one of our buttons / menus) leaves keyboard focus there, and the browser's
+  // built-in controls swallow keys. So: never keep focus on the video, listen in the capture phase (before anything
+  // inside the video sees the key), and stop Space from also "clicking" whatever button has focus.
+  video.addEventListener('focusin', () => setTimeout(() => { if (document.activeElement === video) video.blur(); }));
+  $('#safeSel').addEventListener('change', e => e.target.blur());
+  const isTyping = e => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+  document.addEventListener('keyup', e => { if (e.key === ' ' && video.src && !isTyping(e) && !$('#settings').open) e.preventDefault(); }, true);
   document.addEventListener('keydown', e => {
-    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+    const typing = isTyping(e);
     if (editing && e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
     if (editing && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); return; }
     if (typing || $('#settings').open || !video.src) return;
@@ -1870,8 +1877,10 @@
       case '[': case ']': jumpNote(e.key === ']' ? 1 : -1); break;
       case 'i': case 'I': e.preventDefault(); setMark('in'); break;
       case 'o': case 'O': e.preventDefault(); setMark('out'); break;
+      default: return;
     }
-  });
+    e.stopPropagation(); // handled: the video's built-in controls must not act on it too
+  }, true);
 
   // ---------- export ----------
   const base = () => (videoName.replace(/\.[^.]+$/, '') || '影片') + '_修改表';
