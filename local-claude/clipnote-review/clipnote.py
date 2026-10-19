@@ -22,7 +22,19 @@ STATUS = {'review': '待審', 'changes': '需要修改', 'approved': '已核准'
 DECISION = {'accept': '照改', 'adjust': '改法調整', 'reject': '不改'}
 FPS = {'23.976': (24000 / 1001, 24), '24': (24, 24), '25': (25, 25), '29.97': (30000 / 1001, 30),
        '30': (30, 30), '50': (50, 50), '59.94': (60000 / 1001, 60), '60': (60, 60)}
-NAME_RULE = re.compile(r'^\d{8}_[^/\\]+_v\d+\.(mp4|mov|m4v)$', re.I)
+# …_A Copy, …_B Copy … then …_Final (…_Final_v2), or …_v1, …_v2 (same version rule as the app)
+NAME_RULE = re.compile(r'^\d{8}_[^/\\]+_(v\d+|[A-Z][ _-]?copy|Final([ _-]?v?\d+)?)\.(mp4|mov|m4v)$', re.I)
+
+
+def next_version(name):
+    stem = re.sub(r'\.\w+$', '', name)
+    if m := re.search(r'_Final(?:[ _-]?v?(\d+))?$', stem, re.I):  # before _v: "Final_v2" is a Final
+        return f'_Final_v{int(m[1] or 1) + 1}'
+    if m := re.search(r'_([A-Z])([ _-]?)(copy)$', stem, re.I):  # keep the user's style: "_B Copy", "_Bcopy"…
+        return f'_{chr(ord(m[1].upper()) + 1)}{m[2]}{m[3]}（定剪就用 _Final）'
+    if m := re.search(r'_v(\d+)$', stem, re.I):
+        return f'_v{int(m[1]) + 1}'
+    return '下一個版本'
 
 
 def die(msg):
@@ -137,7 +149,7 @@ def print_note(n, fps, start, show_new=False):
     if n.get('raw') and n['raw'] != n.get('text'):
         print(f"      （原始口述：{n['raw'].replace(chr(10), ' ')}）")
     if n.get('carried'):
-        print(f"      （從 v{n['carried'].get('v', '?')} 帶入，時間碼可能已隨剪接變動，請對照新版）")
+        print(f"      （從 {n['carried'].get('label') or 'v' + str(n['carried'].get('v', '?'))} 帶入，時間碼可能已隨剪接變動，請對照新版）")
     if n.get('decision'):
         print(f"      → 你的決定：{DECISION.get(n['decision'], n['decision'])}" + (f"：{n['decisionNote']}" if n.get('decisionNote') else ''))
     for r in n.get('replies') or []:
@@ -280,10 +292,11 @@ def cmd_upload(conf, a):
     if a.proxy:
         name = re.sub(r'\.\w+$', '.mp4', name)
     if not NAME_RULE.match(name):
-        die(f'檔名「{name}」不符合規則：YYYYMMDD_專案_內容_v版本.mp4，例如 20261018_夏日新品_形象片_v2.mp4。用 --name 指定')
+        die(f'檔名「{name}」不符合規則：YYYYMMDD_專案_內容_版本.mp4，版本寫 A Copy／B Copy…、Final 或 v2，'
+            '例如「20261018_夏日新品_形象片_B Copy.mp4」。用 --name 指定')
     dest = drive / name
     if dest.exists():
-        die(f'雲端資料夾已經有「{name}」。新版本請把版本號加一（v{int(re.search(r"_v(\d+)", name)[1]) + 1}），不要覆蓋舊檔')
+        die(f'雲端資料夾已經有「{name}」。新版本請用下一個版本（{next_version(name)}），不要覆蓋舊檔')
     info = probe(src)
     if not a.proxy and info and (info.get('codec_name') != 'h264' or max(info.get('width', 0), info.get('height', 0)) > 1920):
         print(f"⚠ 這個檔案是 {info.get('codec_name')} {info.get('width')}x{info.get('height')}，瀏覽器可能播不順或播不了。建議加 --proxy 轉成 720p 審片檔。")

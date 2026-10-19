@@ -1731,7 +1731,7 @@
             <span class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}</span>
             ${server() && isClient(n) && !n.submitted && !n.carried ? `<span class="chip unsent" title="${api.mode === 'guest' ? '按上方「送出修改意見」後我們才會收到通知' : '客戶還沒按「送出」，可能還在看'}">未送出</span>` : ''}
           </div>
-          ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 v${esc(n.carried.v ?? '')} 帶入・時間碼可能已隨剪接變動</div>` : ''}
+          ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 ${esc(vlabel(n.carried))} 帶入・時間碼可能已隨剪接變動</div>` : ''}
           <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
           ${n.decision && api.mode !== 'guest' ? `<div class="small decision"><span class="chip ${{ reject: 'fresh', adjust: 'st-changes', accept: 'st-approved' }[n.decision]}">${{ reject: '不改', adjust: '改法調整', accept: '照改' }[n.decision]}</span>${n.decisionNote ? ' ' + esc(n.decisionNote) : ''}</div>` : ''}
           ${n.raw ? `<details class="small muted"><summary>原始口述</summary>${esc(n.raw)}</details>` : ''}
@@ -2335,7 +2335,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const all = prev.flatMap(x => x.notes), done = all.filter(n => n.fixed).length;
     const tc = n => n.general ? '整體' : tcOf(n.t) + (n.t2 != null ? ' → ' + tcOf(n.t2) : '');
     box.innerHTML = `<summary>上一版你的 ${all.length} 則意見：已修改 ${done} 則</summary>`
-      + prev.map(x => x.notes.map(n => `<div class="pnote"><span class="mono small muted">v${x.v} ${tc(n)}</span><span>${esc(n.text)}</span>
+      + prev.map(x => x.notes.map(n => `<div class="pnote"><span class="mono small muted">${esc(vlabel(x))} ${tc(n)}</span><span>${esc(n.text)}</span>
           <span class="chip ${n.fixed ? 'st-approved' : ''}">${n.fixed ? '已修改' : '處理中'}</span>
           ${n.replies?.length ? `<div class="reps">${n.replies.map(r => `↳ <b>${esc(r.by || '')}</b>：${esc(r.text)}`).join('<br>')}</div>` : ''}</div>`).join('')).join('');
   }
@@ -2447,11 +2447,22 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   }
 
   // ---------- versions: carry the previous cut's open notes over, compare side by side ----------
-  // 20261018_夏日新品_形象片_v2.mp4 → family 夏日新品_形象片, v2 (same rule as lib/core.js)
+  // …_v2 / …_Bcopy / …_Final → family + order + label (same rule as lib/core.js)
   function versionOf(name) {
-    const m = String(name || '').replace(/\.[^.]+$/, '').replace(/^\d{8}_/, '').match(/^(.+?)[_ -]?v(\d+)$/i);
-    return m ? { family: m[1], v: +m[2] } : null;
+    const base = String(name || '').replace(/\.[^.]+$/, '').replace(/^\d{8}_/, '');
+    let m;
+    if ((m = base.match(/^(.+?)[_ -]?final(?:[_ -]?v?(\d+))?$/i))) {
+      const n = +(m[2] || 1);
+      return { family: m[1], v: 99 + n, label: n > 1 ? `Final ${n}` : 'Final' };
+    }
+    if ((m = base.match(/^(.+?)[_ -]?([a-z])[_ -]?copy$/i))) {
+      const letter = m[2].toUpperCase();
+      return { family: m[1], v: letter.charCodeAt(0) - 64, label: `${letter} Copy` };
+    }
+    if ((m = base.match(/^(.+?)[_ -]?v(\d+)$/i))) return { family: m[1], v: +m[2], label: 'v' + +m[2] };
+    return null;
   }
+  function vlabel(x) { return x?.label || (x?.v != null ? 'v' + x.v : ''); } // older records only have the number
   function localVersions() {
     const me = versionOf(videoName);
     if (!me) return null;
@@ -2463,7 +2474,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
         const saved = store.get(k, null), v = versionOf(saved?.name);
         if (!v || v.family !== me.family || v.v >= me.v) continue;
         const open = (saved.notes || []).filter(isOpen);
-        previous.push({ id: k, name: saved.name, v: v.v, open: open.length, remaining: open.filter(n => !copied.has(n.id)).length,
+        previous.push({ id: k, name: saved.name, v: v.v, label: v.label, open: open.length, remaining: open.filter(n => !copied.has(n.id)).length,
           carried: notes.filter(n => n.carried?.video === k).length, inFolder: false });
       }
     } catch {}
@@ -2485,11 +2496,11 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const bar = $('#verBar'), prev = versions?.previous?.[0];
     bar.hidden = !prev;
     if (!prev) return;
-    bar.innerHTML = `<span class="iconLabel">${ic('layers')}<span>這是 <b>v${versions.current.v}</b>。上一版 v${prev.v}
+    bar.innerHTML = `<span class="iconLabel">${ic('layers')}<span>這是 <b>${esc(vlabel(versions.current))}</b>。上一版 ${esc(vlabel(prev))}
         ${prev.open ? `還有 <b>${prev.open}</b> 則沒完成` : '的意見都處理完了'}${prev.carried ? `，已帶入 ${prev.carried} 則` : ''}。</span></span>
       <span class="spacer" style="flex:1"></span>
       ${prev.remaining ? `<button class="small primary" data-carry="${esc(prev.id)}">把 ${prev.remaining} 則帶到這一版</button>` : ''}
-      ${prev.inFolder ? `<button class="small" data-cmp="${esc(prev.id)}">${ic('compare')}${cmpOn ? '結束對照' : `和 v${prev.v} 對照`}</button>` : ''}`;
+      ${prev.inFolder ? `<button class="small" data-cmp="${esc(prev.id)}">${ic('compare')}${cmpOn ? '結束對照' : `和 ${esc(vlabel(prev))} 對照`}</button>` : ''}`;
   }
   $('#verBar').addEventListener('click', async e => {
     const b = e.target.closest('button');
@@ -2508,12 +2519,12 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
         for (const n of (store.get(prev.id, null)?.notes || []).filter(isOpen)) {
           if (have.has(n.id)) continue;
           notes.push({ ...n, id: crypto.randomUUID?.() || String(Date.now() + added), done: false,
-            carried: { video: prev.id, id: n.id, v: prev.v, name: prev.name } });
+            carried: { video: prev.id, id: n.id, v: prev.v, label: vlabel(prev), name: prev.name } });
           added++;
         }
         notes.sort(byTime); save();
       }
-      render(); toast(`已把 v${prev.v} 的 ${added} 則意見帶到這一版，時間碼請對照新版確認`);
+      render(); toast(`已把 ${vlabel(prev)} 的 ${added} 則意見帶到這一版，時間碼請對照新版確認`);
       loadVersions();
     } catch (err) { toast('帶入失敗：' + err.message); b.disabled = false; }
   });
@@ -2539,7 +2550,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   $('#cmpVideo').addEventListener('error', () => { if (cmpOn) { toast('上一版的影片打不開，可能已移出審片資料夾'); setCompare(null); renderVersions(); } });
   function placeTags() {
     const show = !!cmpOn && !$('#playerWrap').hidden, sr = $('#stage').getBoundingClientRect();
-    for (const [tag, el, text] of [['#vtagMain', video, `v${versions?.current?.v ?? ''} 這一版`], ['#vtagCmp', $('#cmpVideo'), `v${cmpOn?.v ?? ''} 上一版`]]) {
+    for (const [tag, el, text] of [['#vtagMain', video, `${vlabel(versions?.current)} 這一版`], ['#vtagCmp', $('#cmpVideo'), `${vlabel(cmpOn)} 上一版`]]) {
       const t = $(tag);
       t.hidden = !show;
       if (!show) continue;
