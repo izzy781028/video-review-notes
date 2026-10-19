@@ -95,12 +95,16 @@ def timecode(note, fps='29.97', start='00:00:00:00'):
     if note.get('general'):
         return '整體意見'
     rate, tb = FPS.get(fps, FPS['29.97'])
-    frame = note.get('frame')
-    if frame is None:
-        frame = int(note.get('t', 0) * rate + 1e-4)
     m = re.match(r'^(\d+):(\d+):(\d+)[:;](\d+)$', start or '')
-    frame += ((int(m[1]) * 60 + int(m[2])) * 60 + int(m[3])) * tb + int(m[4]) if m else 0
-    return f'{frame // (tb * 3600):02d}:{frame // (tb * 60) % 60:02d}:{frame // tb % 60:02d}:{frame % tb:02d}'
+    offset = ((int(m[1]) * 60 + int(m[2])) * 60 + int(m[3])) * tb + int(m[4]) if m else 0
+
+    def tc(frame, t):
+        frame = (int((t or 0) * rate + 1e-4) if frame is None else frame) + offset
+        return f'{frame // (tb * 3600):02d}:{frame // (tb * 60) % 60:02d}:{frame // tb % 60:02d}:{frame % tb:02d}'
+    out = tc(note.get('frame'), note.get('t'))
+    if note.get('frame2') is not None or note.get('t2') is not None:  # a range note
+        out += ' → ' + tc(note.get('frame2'), note.get('t2'))
+    return out
 
 
 def find_video(conf, key):
@@ -113,20 +117,28 @@ def find_video(conf, key):
     return hits[0]
 
 
-is_client = lambda n: str(n.get('author', 'owner')).startswith('share:')
+# carried-over notes keep their original author in origAuthor
+is_client = lambda n: str(n.get('origAuthor') or n.get('author', 'owner')).startswith('share:')
+SHAPES = {'arrow': '箭頭', 'box': '方框', 'pen': '手繪線'}
 
 
 def print_note(n, fps, start, show_new=False):
     mark = '🆕 ' if show_new and n.get('new') else ''
     pt = f"（畫面位置 x{n['pt']['x']:.0%} y{n['pt']['y']:.0%}）" if n.get('pt') else ''
+    if n.get('shapes'):
+        pt += '（畫面上有' + '、'.join(dict.fromkeys(SHAPES.get(s.get('type'), '標記') for s in n['shapes'])) + '，用 shot 看截圖）'
     who = f"客戶：{n.get('by') or '外部審片'}" if is_client(n) else '你'
     print(f"  - {mark}[{timecode(n, fps, start)}] [{n.get('cat', '')}] {who}{pt}  id={n['id']}")
     for line in str(n.get('text', '')).splitlines():
         print(f'      {line}')
     if n.get('raw') and n['raw'] != n.get('text'):
         print(f"      （原始口述：{n['raw'].replace(chr(10), ' ')}）")
+    if n.get('carried'):
+        print(f"      （從 v{n['carried'].get('v', '?')} 帶入，時間碼可能已隨剪接變動，請對照新版）")
     if n.get('decision'):
         print(f"      → 你的決定：{DECISION.get(n['decision'], n['decision'])}" + (f"：{n['decisionNote']}" if n.get('decisionNote') else ''))
+    for r in n.get('replies') or []:
+        print(f"      ↳ {r.get('by') or '你'}：{str(r.get('text', '')).replace(chr(10), ' ')}")
 
 
 # ---------------- commands ----------------

@@ -76,9 +76,9 @@
   header h1 { white-space: nowrap; flex: none; font-size: 18px; font-weight: 700; margin: 0 8px 0 0; letter-spacing: .5px; display: flex; align-items: center; gap: 8px; }
   .brand-mark { width: 32px; height: 32px; flex: none; filter: drop-shadow(0 4px 10px rgba(59,43,255,.3)); }
   header .spacer { flex: 1; }
-  button, select, input[type=text], input[type=password], input[type=url], textarea {
+  button, select, input[type=text], input[type=password], input[type=url], input[type=search], textarea {
     font: inherit; color: var(--ink); background: var(--glass-strong); border: 1px solid var(--glass-border); border-radius: 12px; }
-  input[type=text], input[type=password], input[type=url], textarea, select { box-shadow: var(--inset); }
+  input[type=text], input[type=password], input[type=url], input[type=search], textarea, select { box-shadow: var(--inset); }
   button { padding: 7px 12px; cursor: pointer; white-space: nowrap; box-shadow: var(--shadow-soft); transition: transform .12s, background .2s; }
   button:hover { background: var(--accent-soft); }
   button, .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -120,7 +120,7 @@
   select, input[type=text], input[type=password], input[type=url] { padding: 7px 10px; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 20px; padding: 16px; max-width: 1500px; margin: 0 auto; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
   .panel { border-radius: 26px; padding: 16px; }
   #drop { border: 2px dashed var(--line); border-radius: 18px; padding: 40px 16px; text-align: center; color: var(--muted); cursor: pointer; background: var(--glass-flat); }
   #drop.over { border-color: var(--accent); color: var(--accent); }
@@ -135,6 +135,7 @@
     body.portrait #playerWrap > :not(#stage) { grid-column: 2; }
     body.portrait #playerWrap > #timeline { margin-top: 0; }
     body.portrait .transport { flex-wrap: wrap; width: 100%; }
+    body.portrait .viewTools { margin-left: 0; }
   }
   #stage, #stageSpacer { scroll-margin-top: var(--hdr, 84px); }
   /* the video never moves while scrolling */
@@ -167,7 +168,7 @@
   @media (max-width: 900px) {
     body.listCollapsed #listPanel .listBody, body.listCollapsed #statusBar { display: none !important; }
   }
-  body.portrait .note { grid-template-columns: 64px 1fr; }
+  body.portrait .note { grid-template-columns: 64px minmax(0, 1fr); }
   body.portrait .note img { width: 64px; }
   body.portrait #editor img { width: 96px; }
   .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
@@ -176,7 +177,20 @@
   .small { font-size: 12px; }
   #timeline { position: relative; height: 18px; margin-top: 10px; background: var(--glass-flat); box-shadow: var(--inset); border-radius: 9px; cursor: pointer; }
   #timeline .pin { position: absolute; top: 3px; width: 4px; height: 12px; background: var(--accent); border-radius: 2px; transform: translateX(-2px); }
+  #timeline .pin.client { background: var(--warning); }
   #timeline .pin.done { background: var(--good); }
+  #timeline .band { position: absolute; top: 3px; height: 12px; border-radius: 3px; cursor: pointer;
+    background: color-mix(in srgb, var(--accent) 28%, transparent); border-left: 3px solid var(--accent); }
+  #timeline .band.client { background: color-mix(in srgb, var(--warning) 28%, transparent); border-left-color: var(--warning); }
+  #timeline .band.done { background: color-mix(in srgb, var(--good) 24%, transparent); border-left-color: var(--good); }
+  #timeline .pin { cursor: pointer; }
+  #timeline .sel { position: absolute; top: 0; height: 100%; pointer-events: none; border-radius: 3px;
+    background: rgba(208,59,59,.16); border-left: 2px solid var(--rec); border-right: 2px solid var(--rec); }
+  #tlTip { position: absolute; bottom: calc(100% + 10px); width: 240px; transform: translateX(-50%); z-index: 12; padding: 8px; border-radius: 14px;
+    pointer-events: none; background: var(--sheet-bg); border: 1px solid var(--glass-border); box-shadow: var(--shadow); font-size: 12.5px; line-height: 1.5; }
+  #tlTip img { width: 100%; max-height: 150px; object-fit: contain; border-radius: 8px; display: block; margin-bottom: 6px; background: #000; }
+  #tlTip .t { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
+  #tlTip .who { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
   #timeline .head { position: absolute; top: 0; width: 2px; height: 18px; background: var(--rec); }
   #editor { margin-top: 14px; display: none; border-radius: 20px; background: var(--glass-flat); }
   #editor.open { display: block; }
@@ -187,7 +201,7 @@
   #editor textarea { width: 100%; min-height: 96px; padding: 10px 12px; resize: vertical; margin-top: 6px; }
   #recStatus { min-height: 1.5em; }
   #list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 140px); overflow: auto; }
-  .note { display: grid; grid-template-columns: 104px 1fr; gap: 10px; padding: 10px 12px; border-radius: 18px;
+  .note { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; padding: 10px 12px; border-radius: 18px;
     background: var(--glass-flat); border: 1px solid var(--glass-border); box-shadow: var(--shadow-soft); }
   .note.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow-soft); }
   .note.done .text { text-decoration: line-through; color: var(--muted); }
@@ -197,10 +211,36 @@
 
   .note .text { white-space: pre-wrap; word-break: break-word; margin-top: 4px; outline: none; border-radius: 4px; }
   .note .text:focus { box-shadow: 0 0 0 2px var(--accent); }
-  .note .actions { display: flex; gap: 6px; margin-top: 4px; }
+  .note .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .note .decision { margin-top: 4px; color: var(--ink-2); }
   .note:has(.decision .fresh) .text { color: var(--muted); }
   .note .actions button { padding: 3px 10px; font-size: 12px; box-shadow: none; }
+  .note .actions .ic { width: 15px; height: 15px; }
+  /* list tools: filter, search, AI summary */
+  .listTools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+  .listTools input[type=search] { flex: 1; min-width: 120px; padding: 6px 10px; border-radius: 12px; }
+  .listTools .seg button { padding: 5px 11px; }
+  /* who wrote it: owner in brand colours, clients in warm orange */
+  .av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; font-size: 11px; font-weight: 700;
+    color: #fff; background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); }
+  .av.c { background: linear-gradient(135deg, #f5a524, #e8613c); }
+  .note .who { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); }
+  .note .carried { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .replies { margin-top: 6px; display: flex; flex-direction: column; gap: 5px; border-left: 2px solid var(--line); padding-left: 9px; }
+  .reply { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; }
+  .reply .av { width: 18px; height: 18px; font-size: 10px; margin-top: 1px; }
+  .reply time { color: var(--muted); font-size: 11px; margin-left: 4px; }
+  .reply .x { border: 0; background: none; box-shadow: none; padding: 0 2px; color: var(--muted); min-height: 0; margin-left: auto; }
+  .reply .x .ic { width: 14px; height: 14px; }
+  .replyForm { display: flex; gap: 6px; margin-top: 6px; }
+  .replyForm input { flex: 1; min-width: 0; padding: 5px 9px; }
+  #verBar { margin: 0 0 12px; padding: 10px 12px; border-radius: 18px; background: var(--accent-soft); border: 1px solid var(--glass-border); }
+  #verBar .iconLabel { align-items: flex-start; }
+  #sumBody h4 { margin: 16px 0 6px; font-size: 14px; }
+  #sumBody ol, #sumBody ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  #sumBody .ref { border: 0; box-shadow: none; padding: 1px 8px; min-height: 0; margin-left: 4px; cursor: pointer; }
+  #sumBody .pri-high { color: var(--rec); font-weight: 700; }
+  #sumBody .detail { color: var(--ink-2); font-size: 13px; }
   dialog { border-radius: 24px; background: var(--sheet-bg); color: var(--ink); width: min(560px, calc(100vw - 32px)); padding: 20px; }
   dialog::backdrop { background: rgba(40,36,80,.28); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
   dialog label { display: block; margin: 10px 0 4px; font-weight: 600; }
@@ -241,7 +281,26 @@
     background: rgba(20,18,40,.6); color: #fff; font: 600 13px/1.3 -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif;
     font-variant-numeric: tabular-nums; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
   #stageHit { position: absolute; inset: 0 0 52px 0; display: none; cursor: crosshair; }
-  body.editing.timed #stageHit { display: block; }
+  body.editing.timed #stageHit { display: block; touch-action: none; }
+  /* drawings on the frame, safe-zone guides, side-by-side compare with the previous version */
+  #draw, #safe { position: absolute; pointer-events: none; overflow: visible; }
+  #safe { z-index: 2; } #draw { z-index: 3; }
+  #safe text { font: 600 12px "Noto Sans TC", system-ui, sans-serif; }
+  #stage.cmp { display: flex; gap: 8px; align-items: flex-start; justify-content: center; }
+  #stage.cmp video { width: calc(50% - 4px); }
+  body.portrait #stage.cmp video { width: auto; max-width: calc(50% - 4px); height: min(64vh, 820px); }
+  #cmpVideo { order: -1; }
+  .vtag { position: absolute; top: 10px; z-index: 3; padding: 2px 9px; border-radius: 999px; pointer-events: none;
+    background: rgba(20,18,40,.62); color: #fff; font-size: 12px; font-weight: 600; }
+  .tools { margin-top: 6px; }
+  .tools .seg button { padding: 4px 10px; font-size: 12.5px; }
+  .tools .seg .ic { width: 16px; height: 16px; }
+  #safeSel { padding: 5px 8px; font-size: 12.5px; border-radius: 10px; }
+  .ctlRow { gap: 10px; }
+  .viewTools { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+  button.toggled { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-soft); }
+  #btnRate { font-variant-numeric: tabular-nums; min-width: 44px; }
+  #btnAddVoice { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .pt { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 3px solid #ef4444; border-radius: 50%;
     box-shadow: 0 0 0 2px rgba(255,255,255,.85); pointer-events: none; }
   /* status, chips, alerts, toast */
@@ -291,7 +350,7 @@
     body.portrait #editor img { width: 30%; }
     /* while writing a note: smaller vertical video, no transport, so the frame and the editor fit on one screen */
     body.portrait.editing video { height: 36vh; }
-    body.editing .transport, body.editing .kbdhint, body.editing #btnChange, body.editing #btnShare, body.editing #srcName { display: none !important; }
+    body.editing .ctlRow, body.editing .kbdhint, body.editing #btnChange, body.editing #btnShare, body.editing #srcName { display: none !important; }
     #editor img { display: none; } /* the frame is right above; keep the text box and Save on screen */
     #list { max-height: none; overflow: visible; }
     #editor .row { flex-direction: column; }
@@ -302,7 +361,9 @@
       border: 1px solid var(--glass-border); box-shadow: var(--shadow); }
     body { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
     body.editing #addBar { display: none; }
-    .transport { width: 100%; display: grid; grid-template-columns: repeat(7, 1fr); }
+    .transport { width: 100%; flex: 1 1 100%; min-width: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .tools .seg { flex: 1 1 100%; }
+    .tools .seg button { flex: 1; padding: 4px 6px; }
     .transport button { min-width: 0; padding: 6px 2px; font-size: 12px; }
     .transport [data-step=prev], .transport [data-step=next] { font-size: 0; gap: 0; }
     .menu-list { position: fixed; left: 12px; right: 12px; top: auto; }
@@ -315,6 +376,7 @@
     #timeline { height: 28px; }
     #timeline .pin { height: 24px; width: 5px; }
     #timeline .head { height: 28px; }
+    #timeline .band { top: 4px; height: 20px; }
   }
   @media print {
     body > *:not(#printView) { display: none !important; }
@@ -377,10 +439,14 @@
       <div id="stage">
         <video id="video" controls playsinline></video>
         <div id="stageHit" title="點一下標出位置"></div>
+        <video id="cmpVideo" muted playsinline preload="auto" hidden></video>
         <div id="pt" class="pt" hidden></div>
+        <svg id="draw" hidden aria-hidden="true"></svg>
+        <svg id="safe" hidden aria-hidden="true"></svg>
+        <span id="vtagMain" class="vtag" hidden></span><span id="vtagCmp" class="vtag" hidden></span>
         <div id="speed" hidden></div>
       </div>
-      <div id="timeline" title="點擊跳轉"><div class="head" id="head"></div></div>
+      <div id="timeline" title="點擊跳轉"><div class="sel" id="sel" hidden></div><div class="head" id="head"></div><div id="tlTip" hidden></div></div>
       <div class="bar">
         <span id="tc">00:00:00:00</span>
         <button id="fpsBadge" class="small muted" title="更改 FPS / 起始時間碼" style="border:0;background:none;padding:0"></button>
@@ -390,7 +456,8 @@
         <button id="btnChange" class="small ownerOnly">換影片</button>
       </div>
       <div id="srcHint" class="small" style="color:var(--rec)"></div>
-      <div class="bar transport seg">
+      <div class="bar ctlRow">
+      <div class="transport seg">
         <button data-step="-1s">−1秒</button>
         <button data-step="-1f">−1格</button>
         <button data-step="play" id="btnPlay" aria-label="播放／暫停"></button>
@@ -398,6 +465,15 @@
         <button data-step="+1s">+1秒</button>
         <button data-step="prev" title="上一則意見"><i data-ic="prev"></i>意見</button>
         <button data-step="next" title="下一則意見">意見<i data-ic="next"></i></button>
+      </div>
+      <span class="viewTools">
+        <button id="btnRate" class="small ghost" title="播放速度">1×</button>
+        <button id="btnLoop" class="small ghost iconBtn" title="循環播放選中的意見或 I／O 標出的區段" aria-label="循環播放"><i data-ic="loop"></i></button>
+        <select id="safeSel" title="安全框（社群平台介面會蓋住的範圍）" aria-label="安全框">
+          <option value="off">安全框：關</option><option value="reels">IG Reels</option><option value="tiktok">TikTok</option>
+          <option value="shorts">YouTube Shorts</option><option value="title">字幕安全 90%</option>
+        </select>
+      </span>
       </div>
       <div class="bar" id="addBar">
         <button id="btnAddVoice" class="primary" title="快捷鍵 V"><i data-ic="mic"></i>語音意見<kbd>V</kbd></button>
@@ -409,6 +485,7 @@
         <span class="hk"><kbd>←</kbd><kbd>→</kbd><span>逐格</span></span>
         <span class="hk"><kbd>Shift</kbd><i>+</i><kbd>←</kbd><kbd>→</kbd><span>跳 1 秒</span></span>
         <span class="hk"><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><span>倒轉／停／快轉</span></span>
+        <span class="hk"><kbd>I</kbd><kbd>O</kbd><span>標出區段</span></span>
         <span class="hk"><kbd>[</kbd><kbd>]</kbd><span>上／下一則</span></span>
       </div>
 
@@ -417,11 +494,21 @@
           <img id="edThumb" alt="">
           <div style="flex:1; min-width:0">
             <div class="bar" style="margin-top:0">
-              <strong id="edTc" class="mono"></strong>
+              <strong id="edTc" class="mono"></strong><span id="edRange" class="mono small"></span>
               <select id="edCat" aria-label="類別"></select>
               <label class="small toggle"><input type="checkbox" id="edGeneral"> 整體意見</label>
             </div>
-            <div id="ptHint" class="small muted iconLabel"><i data-ic="target"></i>點一下畫面，可以標出你說的位置</div>
+            <div id="toolsRow" class="bar tools">
+              <span class="seg" id="drawTools" title="在畫面上標出你說的位置">
+                <button data-tool="pt" class="on" title="點一下畫面標出位置"><i data-ic="target"></i>圈選</button>
+                <button data-tool="arrow" title="在畫面上拖曳畫箭頭"><i data-ic="arrow"></i>箭頭</button>
+                <button data-tool="box" title="在畫面上拖曳畫方框"><i data-ic="box"></i>方框</button>
+                <button data-tool="pen" title="在畫面上自由畫線"><i data-ic="pen"></i>手繪</button>
+              </span>
+              <button id="btnUndoDraw" class="ghost small" title="移除最後一個標記"><i data-ic="undo"></i>復原</button>
+              <button id="btnOut" class="ghost small" title="播放或拖時間軸到結束的地方，再按這裡：這則意見就涵蓋一整段"><i data-ic="range"></i>設結束點</button>
+              <button id="btnOutClear" class="ghost small" hidden>取消範圍</button>
+            </div>
             <textarea id="edText" placeholder="說出或輸入要修改的地方…"></textarea>
             <div id="recStatus" class="small muted"></div>
             <div class="bar edActions">
@@ -451,11 +538,19 @@
       <button data-status="review" class="ownerOnly"><i data-ic="undo"></i>改回待審</button>
       </span>
     </div>
+    <div id="verBar" class="bar listBody" hidden></div>
     <div class="bar" style="margin-top:0; margin-bottom:8px">
       <strong>修改清單</strong><span id="count" class="muted small"></span>
       <span class="spacer" style="flex:1"></span>
-      <label class="small listBody"><input type="checkbox" id="hideDone"> 隱藏已完成</label>
+      <button id="btnSummary" class="ghost small ownerOnly listBody" title="把未完成的意見整理成待辦清單，標出重複和矛盾"><i data-ic="sparkle"></i>AI 彙整</button>
       <button id="btnCollapse" class="ghost iconBtn" title="收起修改清單" aria-label="收起修改清單"><i data-ic="panelClose"></i></button>
+    </div>
+    <div class="listTools listBody">
+      <span class="seg" id="filterSeg">
+        <button data-f="all">全部</button><button data-f="open">待處理</button>
+        <button data-f="client" class="ownerOnly">客戶</button><button data-f="mine" class="ownerOnly">我的</button>
+      </span>
+      <input id="search" type="search" placeholder="搜尋意見、名字、類別" aria-label="搜尋意見">
     </div>
     <div id="list" class="listBody"><div class="muted small">還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。</div></div>
   </section>
@@ -545,6 +640,13 @@
   <div class="bar"><span class="spacer" style="flex:1"></span><button id="shClose">關閉</button></div>
 </dialog>
 
+<dialog id="sumDlg">
+  <h3 style="margin-top:0" class="iconLabel"><i data-ic="sparkle"></i>AI 彙整</h3>
+  <div id="sumBody"></div>
+  <div class="bar"><span class="small muted">點編號可以跳到那則意見。AI 整理僅供參考，請以原意見為準。</span><span class="spacer" style="flex:1"></span>
+    <button id="sumCopy"><i data-ic="copy"></i>複製</button><button id="sumClose" class="primary">關閉</button></div>
+</dialog>
+
 <dialog id="tour">
   <div id="tourBody"></div>
   <div class="dots" id="tourDots"></div>
@@ -602,6 +704,15 @@
     playCircle: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/>',
     panelClose: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M9 10l2 2-2 2"/>',
     panelOpen: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M11 10l-2 2 2 2"/>',
+    loop: '<path d="M17 3l3 3-3 3"/><path d="M4 12V10a4 4 0 0 1 4-4h12M7 21l-3-3 3-3"/><path d="M20 12v2a4 4 0 0 1-4 4H4"/>',
+    arrow: '<path d="M5 19L19 5M10 5h9v9"/>',
+    box: '<rect x="4" y="6" width="16" height="12" rx="1.5"/>',
+    pen: '<path d="M3 17c3-4 5 2 8-2s4-8 7-6 1 6 3 5"/>',
+    range: '<path d="M4 6v12M20 6v12M8 12h8M8 12l2-2M8 12l2 2M16 12l-2-2M16 12l-2 2"/>',
+    compare: '<rect x="3" y="5" width="8" height="14" rx="1.5"/><rect x="13" y="5" width="8" height="14" rx="1.5"/>',
+    layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+    reply: '<path d="M9 14l-5-5 5-5"/><path d="M4 9h9a7 7 0 0 1 7 7v3"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
   };
   const ic = name => `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
   document.querySelectorAll('i[data-ic]').forEach(el => { el.outerHTML = ic(el.dataset.ic); });
@@ -639,6 +750,7 @@
   const server = () => api.mode !== 'local';
   // project.remote: the Drive file id when this video's notes live on the server
   let project = { remote: null, info: null };
+  let versions = null, cmpOn = null; // earlier versions of this video; the one shown side by side
   const notesPath = () => api.mode === 'guest' ? '/notes' : `/videos/${encodeURIComponent(project.remote)}/notes`;
   function persist(n) {
     if (!project.remote) return save();
@@ -842,17 +954,19 @@
     document.title = `${videoName} – 片語`;
     $('#btnShare').hidden = !(api.mode === 'owner' && project.remote);
     notes.sort(byTime); activeId = null;
-    render(); renderStatus();
+    marks.in = marks.out = null; loop = null; replyOpen = null; setCompare(null);
+    render(); renderStatus(); drawMarks(); syncLoop(); loadVersions();
   }
   $('#urlForm').onsubmit = e => { e.preventDefault(); if ($('#videoUrl').value.trim()) loadUrl($('#videoUrl').value); };
   $('#btnChange').onclick = () => {
     video.pause(); closeEditor();
     $('#loader').hidden = false; $('#playerWrap').hidden = true; $('#urlHint').textContent = '';
-    project = { remote: null, info: null }; notes = []; videoKey = '';
+    project = { remote: null, info: null }; notes = []; videoKey = ''; versions = null;
+    setCompare(null); $('#verBar').hidden = true; loop = null; syncLoop();
     render(); renderStatus(); listDrive();
   };
   $('#fpsBadge').onclick = () => openSettings();
-  const save = () => !project.remote && videoKey && store.set(videoKey, { notes, fps: $('#fps').value, startTc: $('#startTc').value });
+  const save = () => !project.remote && videoKey && store.set(videoKey, { name: videoName, notes, fps: $('#fps').value, startTc: $('#startTc').value });
   $('#fps').onchange = $('#startTc').onchange = () => {
     if (project.remote && api.mode === 'owner')
       api.req(`/videos/${encodeURIComponent(project.remote)}`, { method: 'PATCH', json: { fps: $('#fps').value, startTc: $('#startTc').value } }).catch(err => toast(err.message));
@@ -870,6 +984,25 @@
     const d = { '-1s': -1, '+1s': 1, '-1f': -step, '+1f': step }[k];
     video.currentTime = Math.min(video.duration || Infinity, Math.max(0, video.currentTime + d));
   });
+  // playback speed (the J / L shuttle temporarily overrides it) and looping one note or the I / O range
+  const RATES = [1, 1.5, 2, 0.5];
+  let baseRate = 1, loop = null;
+  $('#btnRate').onclick = () => {
+    baseRate = RATES[(RATES.indexOf(baseRate) + 1) % RATES.length];
+    if (!shuttle.dir) video.playbackRate = baseRate;
+    $('#btnRate').textContent = baseRate + '×';
+    $('#btnRate').classList.toggle('toggled', baseRate !== 1);
+  };
+  const syncLoop = () => $('#btnLoop').classList.toggle('toggled', !!loop);
+  $('#btnLoop').onclick = () => {
+    if (loop) { loop = null; syncLoop(); return; }
+    const fps = fpsInfo()[0], n = notes.find(x => x.id === activeId && !x.general);
+    if (n?.t2 != null) loop = { a: n.t, b: n.t2 };
+    else if (marks.in != null && marks.out != null) loop = { a: marks.in / fps, b: (marks.out + 1) / fps };
+    else if (n) loop = { a: Math.max(0, n.t - 2), b: Math.min(video.duration || Infinity, n.t + 2) };
+    else { toast('先在清單點一則意見，或用 I／O 鍵標出一段，再按循環'); return; }
+    syncLoop(); stopShuttle(); video.currentTime = loop.a; video.play();
+  };
   const playIcon = () => { $('#btnPlay').innerHTML = ic(video.paused ? 'play' : 'pause'); };
   playIcon();
   video.addEventListener('play', playIcon); video.addEventListener('pause', playIcon);
@@ -890,9 +1023,16 @@
     document.body.classList.toggle('portrait', video.videoHeight > video.videoWidth);
     render(); updateTc(); refreshPt();
   });
-  (function tick() { if (!video.paused) updateTc(); requestAnimationFrame(tick); })();
+  (function tick() {
+    if (!video.paused) {
+      updateTc();
+      if (loop && (video.currentTime >= loop.b || video.currentTime < loop.a - 0.5)) video.currentTime = loop.a;
+      syncCompare();
+    }
+    requestAnimationFrame(tick);
+  })();
   $('#timeline').onclick = e => {
-    if (!video.duration || e.target.classList.contains('pin')) return;
+    if (!video.duration || e.target.closest('.pin, .band')) return;
     const r = e.currentTarget.getBoundingClientRect();
     video.currentTime = (e.clientX - r.left) / r.width * video.duration;
   };
@@ -911,7 +1051,10 @@
   }
   function refreshPt() {
     const n = editing ? ($('#edGeneral').checked ? null : editing) : notes.find(x => x.id === activeId);
-    showPt(n && !n.general && n.pt && video.paused && frameOf(video.currentTime) === (n.frame ?? frameOf(video.currentTime)) ? n.pt : null);
+    const here = n && !n.general && video.paused && frameOf(video.currentTime) === (n.frame ?? frameOf(video.currentTime));
+    showPt(here && n.pt ? n.pt : null);
+    showShapes(here ? n.shapes : null);
+    showSafe(); placeTags();
   }
   function drawPt(ctx, w, h, pt) {
     if (!pt) return;
@@ -920,17 +1063,108 @@
     ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(x, y, r + ctx.lineWidth * 0.8, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
   }
-  $('#stageHit').onclick = e => {
+  // arrows, boxes and freehand lines, stored as 0..1 coordinates of the picture
+  const RED = '#ef4444';
+  let drawTool = 'pt', drag = null;
+  function shapeLines(sh, w, h) {
+    const P = sh.pts.map(([x, y]) => [x * w, y * h]);
+    if (sh.type === 'box') { const [[x1, y1], [x2, y2]] = P; return [[[x1, y1], [x2, y1], [x2, y2], [x1, y2], [x1, y1]]]; }
+    if (sh.type === 'arrow') {
+      const [a, b] = P, ang = Math.atan2(b[1] - a[1], b[0] - a[0]), L = Math.max(12, Math.min(w, h) * 0.05);
+      const wing = d => [b[0] - L * Math.cos(ang + d), b[1] - L * Math.sin(ang + d)];
+      return [[a, b], [wing(0.5), b, wing(-0.5)]];
+    }
+    return [P];
+  }
+  const lineW = (w, h) => Math.max(3, Math.min(w, h) * 0.008);
+  function drawShapes(ctx, w, h, shapes) {
+    if (!shapes?.length) return;
+    const lw = lineW(w, h);
+    ctx.lineCap = ctx.lineJoin = 'round';
+    for (const [color, width] of [['rgba(255,255,255,.9)', lw * 2.2], [RED, lw]]) {
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      for (const sh of shapes) for (const line of shapeLines(sh, w, h)) {
+        ctx.beginPath(); line.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+      }
+    }
+  }
+  const drawMarksOn = (ctx, w, h, n) => { drawPt(ctx, w, h, n?.pt); drawShapes(ctx, w, h, n?.shapes); };
+  function overlay(svg) { // size an <svg> to the picture inside the <video> box
+    const c = contentRect();
+    Object.assign(svg.style, { left: c.x + 'px', top: c.y + 'px', width: c.w + 'px', height: c.h + 'px' });
+    svg.setAttribute('viewBox', `0 0 ${c.w} ${c.h}`);
+    return c;
+  }
+  function showShapes(shapes) {
+    const svg = $('#draw');
+    if (!shapes?.length) { svg.toggleAttribute('hidden', true); svg.innerHTML = ''; return; }
+    const c = overlay(svg), lw = lineW(c.w, c.h);
+    const d = shapes.flatMap(sh => shapeLines(sh, c.w, c.h)).map(l => 'M' + l.map(p => p.map(v => v.toFixed(1)).join(' ')).join('L')).join('');
+    svg.innerHTML = [['rgba(255,255,255,.9)', lw * 2.2], [RED, lw]].map(([color, width]) =>
+      `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+    svg.toggleAttribute('hidden', false);
+  }
+  const normAt = e => { const c = contentRect(), sr = $('#stage').getBoundingClientRect(); return [(e.clientX - sr.left - c.x) / c.w, (e.clientY - sr.top - c.y) / c.h]; };
+  const clamp01 = v => +Math.min(1, Math.max(0, v)).toFixed(4);
+  function marksChanged() { editing.thumb = grabThumb(editing); $('#edThumb').src = editing.thumb; refreshPt(); }
+  $('#stageHit').addEventListener('pointerdown', e => {
     if (!editing || $('#edGeneral').checked) return;
-    const c = contentRect(), sr = $('#stage').getBoundingClientRect();
-    const x = (e.clientX - sr.left - c.x) / c.w, y = (e.clientY - sr.top - c.y) / c.h;
+    const [x, y] = normAt(e);
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    editing.pt = { x: +x.toFixed(4), y: +y.toFixed(4) };
-    editing.thumb = grabThumb(editing.pt);
-    $('#edThumb').src = editing.thumb;
-    refreshPt();
+    e.preventDefault();
+    if (drawTool === 'pt') { editing.pt = { x: clamp01(x), y: clamp01(y) }; marksChanged(); return; }
+    $('#stageHit').setPointerCapture(e.pointerId);
+    drag = { type: drawTool, pts: [[clamp01(x), clamp01(y)]] };
+    if (drawTool !== 'pen') drag.pts.push(drag.pts[0].slice());
+  });
+  $('#stageHit').addEventListener('pointermove', e => {
+    if (!drag) return;
+    const p = normAt(e).map(clamp01), last = drag.pts.at(-1);
+    if (drag.type !== 'pen') drag.pts[1] = p;
+    else if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 0.004 && drag.pts.length < 400) drag.pts.push(p);
+    showShapes([...(editing.shapes || []), drag]);
+  });
+  const endDrag = () => {
+    if (!drag || !editing) { drag = null; return; }
+    const sh = drag, a = sh.pts[0], b = sh.pts.at(-1);
+    drag = null;
+    if (sh.type === 'pen' ? sh.pts.length > 2 : Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.02) (editing.shapes ||= []).push(sh);
+    marksChanged();
   };
-  video.addEventListener('play', () => showPt(null));
+  $('#stageHit').addEventListener('pointerup', endDrag);
+  $('#stageHit').addEventListener('pointercancel', endDrag);
+  $('#drawTools').onclick = e => {
+    const b = e.target.closest('[data-tool]');
+    if (!b) return;
+    drawTool = b.dataset.tool;
+    $('#drawTools').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  };
+  $('#btnUndoDraw').onclick = () => {
+    if (!editing) return;
+    if (editing.shapes?.length) editing.shapes.pop(); else editing.pt = null;
+    marksChanged();
+  };
+
+  // safe-zone guides: where the platform's buttons and captions cover a vertical video (approximate, for reference)
+  const SAFE = {
+    reels: { label: 'IG Reels', t: 0.13, b: 0.25, l: 0.06, r: 0.12 },
+    tiktok: { label: 'TikTok', t: 0.08, b: 0.25, l: 0.06, r: 0.13 },
+    shorts: { label: 'YouTube Shorts', t: 0.1, b: 0.22, l: 0.06, r: 0.14 },
+    title: { label: '字幕安全', t: 0.05, b: 0.05, l: 0.05, r: 0.05 },
+  };
+  let safeMode = store.get('vrn.safe', 'off');
+  $('#safeSel').value = SAFE[safeMode] ? safeMode : 'off';
+  $('#safeSel').onchange = () => { safeMode = $('#safeSel').value; store.set('vrn.safe', safeMode); showSafe(); };
+  function showSafe() {
+    const svg = $('#safe'), z = SAFE[safeMode];
+    if (!z || !video.videoWidth || $('#playerWrap').hidden) { svg.toggleAttribute('hidden', true); return; }
+    const c = overlay(svg), x = z.l * c.w, y = z.t * c.h, w = c.w * (1 - z.l - z.r), h = c.h * (1 - z.t - z.b);
+    svg.innerHTML = `<path fill="rgba(10,8,30,.42)" fill-rule="evenodd" d="M0 0H${c.w}V${c.h}H0Z M${x} ${y}h${w}v${h}h${-w}Z"/>
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="6 5" opacity=".9"/>
+      <text x="${x + 8}" y="${y + 18}" fill="#fff">${z.label} 安全範圍（參考）</text>`;
+    svg.toggleAttribute('hidden', false);
+  }
+  video.addEventListener('play', () => { showPt(null); showShapes(null); });
   video.addEventListener('seeked', refreshPt);
   window.addEventListener('resize', refreshPt);
 
@@ -952,25 +1186,64 @@
   window.addEventListener('resize', schedulePin);
   narrow.addEventListener?.('change', schedulePin);
 
-  function grabThumb(pt) {
+  function grabThumb(n) {
     if (!video.videoWidth) return '';
     const c = document.createElement('canvas'), k = 320 / Math.max(video.videoWidth, video.videoHeight);
     c.width = Math.round(video.videoWidth * k); c.height = Math.round(video.videoHeight * k);
     c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
-    drawPt(c.getContext('2d'), c.width, c.height, pt);
+    drawMarksOn(c.getContext('2d'), c.width, c.height, n);
     try { return c.toDataURL('image/jpeg', 0.7); } catch { return ''; }
   }
 
   // ---------- editor ----------
   const cats = () => settings.cats.split(/[,，]/).map(s => s.trim()).filter(Boolean);
   // a general note (整體意見) has no timecode: t / frame are null
-  const label = n => n.general ? '整體意見' : tcOfFrame(n.frame);
+  const tcRange = n => n.frame2 != null ? `${tcOfFrame(n.frame)} → ${tcOfFrame(n.frame2)}` : tcOfFrame(n.frame);
+  const label = n => n.general ? '整體意見' : tcRange(n);
+  const isOpen = n => !n.done && n.decision !== 'reject';
+  // a client's note: from a share link (or carried over from one); in the single-device mode, anyone but the reviewer set in 設定
+  const isClient = n => api.mode === 'local' ? !!(n.by && settings.reviewer && n.by !== settings.reviewer) : (n.origAuthor || n.author || 'owner') !== 'owner';
+  function avatar(name, client) {
+    const s = String(name || '').trim(), ch = s ? (/^[a-z]/i.test(s) ? s[0].toUpperCase() : [...s][0]) : '我';
+    return `<span class="av${client ? ' c' : ''}" title="${esc(s || '我')}${client ? '（客戶）' : ''}">${esc(ch)}</span>`;
+  }
+
+  // ---------- in / out (I / O): a note can cover a whole range ----------
+  const marks = { in: null, out: null };
+  function setMark(which) {
+    const f = frameOf(video.currentTime);
+    marks[which] = marks[which] === f ? null : f;
+    if (marks.in != null && marks.out != null && marks.out <= marks.in) marks[which === 'in' ? 'out' : 'in'] = null;
+    drawMarks();
+    toast(marks.in != null && marks.out != null ? `區段 ${tcOfFrame(marks.in)} → ${tcOfFrame(marks.out)}，按 Enter 或 V 寫這一段的意見`
+      : marks[which] != null ? `${which === 'in' ? '起點' : '終點'} ${tcOfFrame(f)}` : `已取消${which === 'in' ? '起點' : '終點'}`);
+  }
+  function drawMarks() {
+    const sel = $('#sel');
+    if (!video.duration || (marks.in == null && marks.out == null)) { sel.hidden = true; return; }
+    const fps = fpsInfo()[0], a = (marks.in ?? marks.out) / fps, b = ((marks.out ?? marks.in) + 1) / fps;
+    sel.style.left = a / video.duration * 100 + '%';
+    sel.style.width = Math.max(0.4, (b - a) / video.duration * 100) + '%';
+    sel.hidden = false;
+  }
   const byTime = (a, b) => (a.general ? -1 : a.frame) - (b.general ? -1 : b.frame);
   function openEditor(note, general = false) {
     stopShuttle();
     video.pause();
-    editing = note || { id: crypto.randomUUID?.() || String(Date.now()), t: video.currentTime, frame: frameOf(video.currentTime),
-      text: '', cat: cats()[0] || '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
+    const ranged = !note && !general && marks.in != null;
+    // edit a copy: Cancel leaves the note untouched
+    editing = note ? { ...note, pt: note.pt && { ...note.pt }, shapes: note.shapes?.map(sh => ({ ...sh, pts: sh.pts.map(p => p.slice()) })) }
+      : { id: crypto.randomUUID?.() || String(Date.now()), t: video.currentTime, frame: frameOf(video.currentTime),
+        text: '', cat: cats()[0] || '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
+    if (ranged) { // I / O marks: the note covers that range; its picture is the first frame
+      const fps = fpsInfo()[0];
+      Object.assign(editing, { frame: marks.in, t: (marks.in + 0.5) / fps, thumb: '' });
+      if (marks.out != null) Object.assign(editing, { frame2: marks.out, t2: (marks.out + 0.5) / fps });
+      marks.in = marks.out = null; drawMarks();
+      const target = editing;
+      video.addEventListener('seeked', () => { if (editing === target && !target.thumb) { target.thumb = grabThumb(target); syncGeneral(); } }, { once: true });
+      seekFrame(target.frame);
+    }
     $('#edCat').innerHTML = cats().map(c => `<option${c === editing.cat ? ' selected' : ''}>${esc(c)}</option>`).join('');
     $('#edGeneral').checked = general || !!editing.general;
     syncGeneral();
@@ -985,12 +1258,23 @@
   function syncGeneral() {
     const g = $('#edGeneral').checked;
     $('#edTc').textContent = g ? '整體意見（全片）' : tcOfFrame(editing.frame ?? frameOf(video.currentTime));
-    $('#edThumb').src = g ? '' : (editing.thumb || grabThumb(editing.pt));
-    $('#ptHint').hidden = g;
+    $('#edRange').textContent = !g && editing.frame2 != null ? ` → ${tcOfFrame(editing.frame2)}` : '';
+    $('#btnOutClear').hidden = g || editing.frame2 == null;
+    $('#edThumb').src = g ? '' : (editing.thumb || grabThumb(editing));
+    $('#toolsRow').hidden = g;
     document.body.classList.toggle('timed', !g);
     refreshPt();
   }
   $('#edGeneral').onchange = syncGeneral;
+  $('#btnOut').onclick = () => {
+    if (!editing || $('#edGeneral').checked) return;
+    const start = editing.frame ?? frameOf(video.currentTime), f = frameOf(video.currentTime);
+    if (f <= start) { status('先播放或拖時間軸到這段結束的地方，再按「設結束點」。'); return; }
+    Object.assign(editing, { frame: start, frame2: f, t2: (f + 0.5) / fpsInfo()[0] });
+    status(`範圍 ${tcOfFrame(start)} → ${tcOfFrame(f)}`);
+    seekFrame(start); syncGeneral();
+  };
+  $('#btnOutClear').onclick = () => { if (editing) { delete editing.frame2; delete editing.t2; syncGeneral(); } };
   function closeEditor() {
     if (rec.active) rec.stop(true);
     editing = null; $('#editor').classList.remove('open'); document.body.classList.remove('editing', 'timed'); document.activeElement?.blur();
@@ -1003,28 +1287,52 @@
     editing.text = text; editing.cat = $('#edCat').value;
     if (editing.raw === text) delete editing.raw;
     if ($('#edGeneral').checked) {
-      Object.assign(editing, { general: true, t: null, frame: null, thumb: '', pt: null });
+      Object.assign(editing, { general: true, t: null, frame: null, t2: null, frame2: null, thumb: '', pt: null, shapes: null });
     } else if (editing.general || editing.frame == null) {
       // a general note turned into a timed one takes the current playhead
-      Object.assign(editing, { general: false, t: video.currentTime, frame: frameOf(video.currentTime), thumb: grabThumb(editing.pt) });
+      Object.assign(editing, { general: false, t: video.currentTime, frame: frameOf(video.currentTime), t2: null, frame2: null, thumb: grabThumb(editing) });
     }
     if (editing.isNew) { delete editing.isNew; notes.push(editing); }
+    else { const i = notes.findIndex(n => n.id === editing.id); if (i >= 0) notes[i] = editing; else notes.push(editing); }
     activeId = editing.id;
     notes.sort(byTime);
     persist(editing); closeEditor(); render();
   }
   $('#btnAddText').onclick = () => { openEditor(); $('#edText').focus(); };
   $('#btnAddGeneral').onclick = () => { openEditor(null, true); $('#edText').focus(); };
-  $('#btnAddVoice').onclick = () => { openEditor(); rec.start(); };
+  // phones: hold the button to talk, let go to stop (a quick tap still starts a recording you stop with 停止)
+  const coarse = matchMedia('(pointer: coarse)');
+  let pttUsed = false;
+  if (coarse.matches) $('#btnAddVoice').innerHTML = ic('mic') + '按住說話';
+  $('#btnAddVoice').addEventListener('pointerdown', e => {
+    if (!coarse.matches || e.button) return;
+    e.preventDefault();
+    pttUsed = true;
+    const at = Date.now();
+    if (!editing) openEditor();
+    rec.start(true);
+    const up = () => {
+      window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      if (Date.now() - at < 450) { // a tap, not a hold: keep recording until 停止
+        rec.hold = false;
+        if (rec.active) status('錄音中… 講完按「停止」');
+        return;
+      }
+      if (rec.active) rec.stop(); else rec.holdStop = true;
+    };
+    window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  });
+  $('#btnAddVoice').onclick = () => { if (pttUsed) { pttUsed = false; return; } openEditor(); rec.start(); };
   $('#btnRec').onclick = () => rec.active ? rec.stop() : rec.start();
   $('#btnSave').onclick = commit;
   $('#btnCancel').onclick = closeEditor;
 
   // ---------- speech ----------
   const rec = {
-    active: false, mr: null, chunks: [], sr: null, base: '',
-    start() {
+    active: false, mr: null, chunks: [], sr: null, base: '', hold: false, holdStop: false, startedAt: 0,
+    start(hold = false) {
       if (this.active) return;
+      this.hold = hold; this.holdStop = false;
       const engine = settings.engine;
       if (!server() && ((engine === 'elevenlabs' && !settings.elKey) || (engine === 'openai' && !settings.oaKey))) {
         status('請先到「設定」填入 API Key，或改用瀏覽器內建辨識。'); openSettings(); return;
@@ -1041,8 +1349,9 @@
           if (this.discard) return;
           transcribe(new Blob(this.chunks, { type: this.mr.mimeType || 'audio/webm' }));
         };
-        this.discard = false; this.mr.start(); this.active = true; recUi(true);
-        status('錄音中… 講完按「停止」或再按 V');
+        this.discard = false; this.mr.start(); this.active = true; this.startedAt = Date.now(); recUi(true);
+        status(this.hold ? '錄音中… 放開就停止' : '錄音中… 講完按「停止」或再按 V');
+        if (this.holdStop) this.stop();
       }).catch(err => status('無法使用麥克風：' + err.message));
     },
     startBrowser() {
@@ -1061,10 +1370,14 @@
       };
       sr.onerror = e => status('辨識錯誤：' + e.error);
       sr.onend = () => { if (this.active) { this.active = false; recUi(false); status('辨識完成，可以直接修改文字再儲存。'); $('#edText').focus(); afterSpeech(); } };
-      sr.start(); this.active = true; recUi(true); status('聆聽中…（即時辨識）講完按「停止」或再按 V');
+      sr.start(); this.active = true; this.startedAt = Date.now(); recUi(true);
+      status(this.hold ? '聆聽中… 放開就停止' : '聆聽中…（即時辨識）講完按「停止」或再按 V');
+      if (this.holdStop) this.stop();
     },
     stop(discard = false) {
       if (!this.active) return;
+      // released too soon to have said anything (e.g. right after the microphone permission prompt)
+      if (!discard && Date.now() - this.startedAt < 600) { discard = true; status('按住按鈕說話，講完再放開。'); }
       this.discard = discard;
       if (this.sr) { this.sr.stop(); this.sr = null; if (discard) { this.active = false; recUi(false); } return; }
       this.active = false; recUi(false);
@@ -1193,9 +1506,25 @@
 
   // ---------- list ----------
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const FILTERS = { all: () => true, open: isOpen, client: isClient, mine: n => !isClient(n) };
+  let listFilter = store.get('vrn.filter', 'all'), query = '', replyOpen = null;
+  if (!FILTERS[listFilter]) listFilter = 'all';
+  const fmtShort = at => new Date(at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const mineReply = r => api.mode === 'guest' ? r.author !== 'owner' : (r.author || 'owner') === 'owner';
+  function repliesHtml(n) {
+    const rs = n.replies || [];
+    return (rs.length ? `<div class="replies">${rs.map(r => `<div class="reply">${avatar(r.by, (r.author || 'owner') !== 'owner')}
+        <span><b>${esc(r.by || '你')}</b>　${esc(r.text)}<time>${fmtShort(r.at)}</time></span>
+        ${mineReply(r) ? `<button class="x" data-act="delReply" data-rid="${esc(r.id)}" title="刪除這則回覆" aria-label="刪除這則回覆">${ic('x')}</button>` : ''}</div>`).join('')}</div>` : '')
+      + (replyOpen === n.id ? `<form class="replyForm" data-id="${esc(n.id)}"><input name="t" placeholder="寫回覆…" autocomplete="off" maxlength="2000" aria-label="回覆">
+        <button class="primary">送出</button></form>` : '');
+  }
   function render() {
-    const hide = $('#hideDone').checked, shown = notes.filter(n => !hide || !n.done);
-    $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}` : '';
+    const f = api.mode === 'guest' && !['all', 'open'].includes(listFilter) ? 'all' : listFilter, q = query.trim().toLowerCase();
+    $('#filterSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.f === f));
+    const shown = notes.filter(FILTERS[f]).filter(n => !q || [label(n), n.text, n.by, n.cat, n.raw, ...(n.replies || []).map(r => r.text)]
+      .join(' ').toLowerCase().includes(q));
+    $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}${shown.length !== notes.length ? `・顯示 ${shown.length}` : ''}` : '';
     $('#railCount').textContent = notes.length; $('#railCount').hidden = !notes.length;
     $('#list').innerHTML = shown.length ? shown.map(n => `
       <div class="note${n.done ? ' done' : ''}${n.general ? ' general' : ''}${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
@@ -1205,31 +1534,63 @@
             <button class="tcbtn" data-act="seek">${label(n)}</button>
             <span class="chip">#${notes.indexOf(n) + 1}</span>
             ${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}
-            ${n.by ? `<span class="small muted">${esc(n.by)}</span>` : ''}
-            ${n.author && n.author !== 'owner' && api.mode === 'owner' ? '<span class="chip st-changes">外部</span>' : ''}
+            <span class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}</span>
           </div>
+          ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 v${esc(n.carried.v ?? '')} 帶入・時間碼可能已隨剪接變動</div>` : ''}
           <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
           ${n.decision && api.mode !== 'guest' ? `<div class="small decision"><span class="chip ${{ reject: 'fresh', adjust: 'st-changes', accept: 'st-approved' }[n.decision]}">${{ reject: '不改', adjust: '改法調整', accept: '照改' }[n.decision]}</span>${n.decisionNote ? ' ' + esc(n.decisionNote) : ''}</div>` : ''}
           ${n.raw ? `<details class="small muted"><summary>原始口述</summary>${esc(n.raw)}</details>` : ''}
+          ${repliesHtml(n)}
           <div class="actions">
             ${api.mode === 'guest' ? '' : `<button data-act="done">${n.done ? ic('undo') + '未完成' : ic('check') + '已修改'}</button>`}
+            <button data-act="reply">${ic('reply')}回覆${n.replies?.length ? ' ' + n.replies.length : ''}</button>
             <button data-act="edit">編輯</button>
             <button data-act="del">刪除</button>
           </div>
         </div>
-      </div>`).join('') : `<div class="muted small">${notes.length ? '全部完成了，辛苦了！' : '還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。'}</div>`;
+      </div>`).join('') : `<div class="muted small">${!notes.length ? '還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。'
+        : q ? '找不到符合的意見。' : f === 'open' ? '全部完成了，辛苦了！' : '沒有符合的意見。'}</div>`;
+    // timeline: ranges as bands, points as pins; owner / client / done in different colours
     const tl = $('#timeline');
-    tl.querySelectorAll('.pin').forEach(p => p.remove());
+    tl.querySelectorAll('.pin, .band').forEach(p => p.remove());
     if (video.duration) for (const n of notes.filter(n => !n.general)) {
+      const cls = n.done ? ' done' : isClient(n) ? ' client' : '';
+      const els = [];
+      if (n.t2 != null) {
+        const b = document.createElement('div');
+        b.className = 'band' + cls;
+        b.style.left = (n.t / video.duration * 100) + '%';
+        b.style.width = Math.max(0.4, (n.t2 - n.t) / video.duration * 100) + '%';
+        els.push(b);
+      }
       const p = document.createElement('div');
-      p.className = 'pin' + (n.done ? ' done' : '');
+      p.className = 'pin' + cls;
       p.style.left = (n.t / video.duration * 100) + '%';
-      p.title = `${tcOfFrame(n.frame)} ${n.text}`;
-      p.onclick = () => { video.pause(); activeId = n.id; seekFrame(n.frame); render(); refreshPt(); };
-      tl.appendChild(p);
+      els.push(p);
+      for (const el of els) {
+        el.dataset.id = n.id;
+        el.onclick = () => { video.pause(); activeId = n.id; seekFrame(n.frame); hideTip(); render(); refreshPt(); };
+        el.onmouseenter = () => showTip(n, el);
+        el.onmouseleave = hideTip;
+        tl.insertBefore(el, $('#head'));
+      }
     }
   }
-  $('#hideDone').onchange = render;
+  function showTip(n, el) {
+    const tip = $('#tlTip'), tl = $('#timeline'), w = tl.clientWidth;
+    tip.innerHTML = `${n.thumb ? `<img src="${n.thumb}" alt="">` : ''}<div class="mono"><b>${label(n)}</b>　<span class="chip">#${notes.indexOf(n) + 1}</span></div>
+      <div class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}</div><div class="t">${esc(n.text)}</div>`;
+    const x = el.offsetLeft + (el.classList.contains('band') ? 0 : el.offsetWidth / 2);
+    tip.style.left = Math.min(w - 120, Math.max(120, x)) + 'px';
+    tip.hidden = false;
+  }
+  const hideTip = () => { $('#tlTip').hidden = true; };
+  $('#filterSeg').onclick = e => {
+    const b = e.target.closest('[data-f]');
+    if (!b) return;
+    listFilter = b.dataset.f; store.set('vrn.filter', listFilter); render();
+  };
+  $('#search').addEventListener('input', e => { query = e.target.value; render(); });
   const setCollapsed = on => {
     document.body.classList.toggle('listCollapsed', on); store.set('vrn.listCollapsed', on);
     $('#btnCollapse').innerHTML = ic(on ? 'panelOpen' : 'panelClose');
@@ -1241,14 +1602,41 @@
   $('#listRail').onclick = () => setCollapsed(false);
   setCollapsed(!!store.get('vrn.listCollapsed', false));
   $('#list').addEventListener('click', e => {
-    const act = e.target.dataset.act, el = e.target.closest('.note');
+    const btn = e.target.closest('[data-act]'), act = btn?.dataset.act, el = e.target.closest('.note');
     if (!act || !el) return;
     const n = notes.find(n => n.id === el.dataset.id);
+    if (act === 'reply') { replyOpen = replyOpen === n.id ? null : n.id; render(); $('#list .replyForm input')?.focus(); return; }
+    if (act === 'delReply') { deleteReplyOf(n, btn.dataset.rid); return; }
     if (act === 'seek') { video.pause(); activeId = n.id; if (!n.general) seekFrame(n.frame); render(); refreshPt(); }
     if (act === 'done') { n.done = !n.done; persist(n); render(); }
     if (act === 'edit') { if (!n.general) seekFrame(n.frame); openEditor(n); $('#edText').focus(); }
     if (act === 'del' && confirm(`刪除「${label(n)}」這則意見？`)) { notes.splice(notes.indexOf(n), 1); unpersist(n); render(); }
   });
+  async function deleteReplyOf(n, rid) {
+    if (!confirm('刪除這則回覆？')) return;
+    try {
+      if (project.remote) await api.req(api.mode === 'guest' ? `/replies/${encodeURIComponent(rid)}` : `/videos/${encodeURIComponent(project.remote)}/replies/${encodeURIComponent(rid)}`, { method: 'DELETE' });
+      n.replies = (n.replies || []).filter(r => r.id !== rid);
+      if (!project.remote) save();
+      render();
+    } catch (err) { toast('刪除失敗：' + err.message); }
+  }
+  $('#list').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = e.target, n = notes.find(x => x.id === form.dataset.id), text = form.t.value.trim();
+    if (!n || !text) return;
+    form.querySelector('button').disabled = true;
+    try {
+      const reply = project.remote
+        ? (await api.req(`${notesPath()}/${encodeURIComponent(n.id)}/replies`, { method: 'POST', json: { text } })).reply
+        : { id: Date.now().toString(36), author: 'owner', by: settings.reviewer || '我', text, at: Date.now() };
+      (n.replies ||= []).push(reply);
+      replyOpen = null;
+      if (!project.remote) save();
+      render();
+    } catch (err) { toast('回覆失敗：' + err.message); form.querySelector('button').disabled = false; }
+  });
+  $('#list').addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.closest('.replyForm')) { replyOpen = null; render(); } });
   $('#list').addEventListener('blur', e => {
     if (e.target.dataset.act !== 'text') return;
     const n = notes.find(n => n.id === e.target.closest('.note').dataset.id);
@@ -1265,7 +1653,7 @@
   }
   function stopShuttle() {
     cancelAnimationFrame(shuttle.raf); shuttle.dir = 0; shuttle.speed = 0;
-    video.playbackRate = 1; showSpeed();
+    video.playbackRate = baseRate; showSpeed();
   }
   function reverseTick(now) {
     if (shuttle.dir >= 0) return;
@@ -1309,6 +1697,8 @@
       case 'l': case 'L': e.preventDefault(); shuttleForward(); break;
       case 'j': case 'J': e.preventDefault(); shuttleBack(); break;
       case '[': case ']': jumpNote(e.key === ']' ? 1 : -1); break;
+      case 'i': case 'I': e.preventDefault(); setMark('in'); break;
+      case 'o': case 'O': e.preventDefault(); setMark('out'); break;
     }
   });
 
@@ -1351,7 +1741,7 @@
     const timed = timedNotes();
     if (!timed.length) return alert('沒有指定時間碼的意見');
     const srt = timed.map((n, i) => {
-      const end = Math.min(n.t + 3, timed[i + 1] ? timed[i + 1].t : Infinity, video.duration || Infinity);
+      const end = n.t2 != null ? n.t2 : Math.min(n.t + 3, timed[i + 1] ? timed[i + 1].t : Infinity, video.duration || Infinity);
       return `${i + 1}\n${srtTime(n.t)} --> ${srtTime(Math.max(end, n.t + 0.5))}\n#${notes.indexOf(n) + 1} [${n.cat}] ${n.text}\n`;
     }).join('\n');
     download(base() + '.srt', srt, 'text/plain;charset=utf-8');
@@ -1384,7 +1774,7 @@
     const rate = `<rate><timebase>${tb}</timebase><ntsc>${ntsc ? 'TRUE' : 'FALSE'}</ntsc></rate>`;
     const w = video.videoWidth || 1920, h = video.videoHeight || 1080;
     const markers = timed.map(n =>
-      `<marker><name>${x(`#${notes.indexOf(n) + 1} ${n.cat}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${n.frame}</in><out>-1</out></marker>`).join('\n      ');
+      `<marker><name>${x(`#${notes.indexOf(n) + 1} ${n.cat}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${n.frame}</in><out>${n.frame2 ?? -1}</out></marker>`).join('\n      ');
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE xmeml>
 <xmeml version="4">
@@ -1450,7 +1840,7 @@
       const c = document.createElement('canvas');
       c.width = Math.round(vw * k); c.height = Math.round(vh * k);
       c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
-      drawPt(c.getContext('2d'), c.width, c.height, timed[i].pt);
+      drawMarksOn(c.getContext('2d'), c.width, c.height, timed[i]);
       try { out[timed[i].id] = { url: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height }; } catch { break; } // cross-origin video: no screenshots
     }
     video.currentTime = back; btn.innerHTML = label0;
@@ -1504,7 +1894,8 @@
     const logo = svg ? `<img class="logo" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}" alt="">` : '';
     const chip = (t, cls = '') => `<span class="chip ${cls}">${esc(t)}</span>`;
     const status = n => { const [box, t] = D.statusOf(n); return `<span class="st ${n.done ? 'ok' : n.decision === 'reject' ? 'no' : ''}">${box} ${t}</span>`; };
-    const extra = n => [n.by ? `<span class="by">${esc(n.by)}</span>` : '', D.decisionOf(n) ? `<span class="dec">處理：${esc(D.decisionOf(n))}</span>` : ''].join('');
+    const extra = n => [n.by ? `<span class="by">${esc(n.by)}</span>` : '', D.decisionOf(n) ? `<span class="dec">處理：${esc(D.decisionOf(n))}</span>` : ''].join('')
+      + (n.replies?.length ? `<div class="reps">${n.replies.map(r => `<div>↳ <b>${esc(r.by || '你')}</b>：${esc(r.text)}</div>`).join('')}</div>` : '');
     let sec = 0;
     const head = t => `<h2><span class="no">${pad2(++sec)}</span>${t}</h2>`;
     return `<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1533,7 +1924,7 @@ h2 .no{font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.08em}
 .gen li{display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start;padding:12px 16px;border:1px solid var(--line);border-radius:10px}
 .idx{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .txt{white-space:pre-wrap}.sub{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
-.by{font-size:12px;color:var(--muted)}.dec{font-size:12px;color:var(--ink2);background:#fff7e8;border-radius:6px;padding:0 6px}
+.by{font-size:12px;color:var(--muted)}.reps{flex-basis:100%;font-size:12.5px;color:var(--ink2);border-left:2px solid var(--line);padding-left:8px;margin-top:2px}.dec{font-size:12px;color:var(--ink2);background:#fff7e8;border-radius:6px;padding:0 6px}
 .st{font-size:12.5px;white-space:nowrap;color:var(--warn);font-weight:500}.st.ok{color:var(--ok)}.st.no{color:var(--no)}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:12px;font-weight:700;letter-spacing:.06em;text-align:left;color:#fff;background:var(--accent);padding:9px 12px}
@@ -1563,7 +1954,7 @@ ${D.timed.length ? `${head('逐點修改')}<table><thead><tr><th>#</th><th>畫�
 ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   return `<tr><td class="n">${notes.indexOf(n) + 1}</td>
   <td class="img">${sh ? `<div class="shot${tall ? ' tall' : ''}"><img src="${sh.url}" alt=""><span class="tc">${tcOfFrame(n.frame)}</span></div>` : `<div class="tcx">${tcOfFrame(n.frame)}</div>`}</td>
-  <td><div class="tcx">${tcOfFrame(n.frame)}</div><div class="txt">${esc(n.text)}</div><div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></td>
+  <td><div class="tcx">${tcRange(n)}</div><div class="txt">${esc(n.text)}</div><div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></td>
   <td class="s">${status(n)}</td></tr>`; }).join('')}
 </tbody></table>` : ''}
 <footer class="foot"><span>片語 Clipnote · ${esc(D.title)}</span><span>產出 ${esc(D.meta[4][1])}</span></footer>
@@ -1611,7 +2002,8 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const bytes = url => Uint8Array.from(atob(url.split(',')[1]), ch => ch.charCodeAt(0));
     const statusRun = n => { const [box, t] = D.statusOf(n); return R(`${box} ${t}`, { color: n.done ? '12813A' : n.decision === 'reject' ? '8A8799' : 'B25E00', bold: true, size: 19 }); };
     const subLine = n => P([...(n.cat ? [R(n.cat, { color: ACCENT, size: 17 })] : []), ...(n.by ? [R(`　${n.by}`, { color: MUTED, size: 17 })] : []),
-      ...(D.decisionOf(n) ? [R(`　處理：${D.decisionOf(n)}`, { color: INK2, size: 17, highlight: 'yellow' })] : [])], { spacing: { before: 60 } });
+      ...(D.decisionOf(n) ? [R(`　處理：${D.decisionOf(n)}`, { color: INK2, size: 17, highlight: 'yellow' })] : []),
+      ...(n.replies || []).flatMap(r => [R(`↳ ${r.by || '你'}：${r.text}`, { color: INK2, size: 17, break: 1 })])], { spacing: { before: 60 } });
     let sec = 0;
     const heading = t => P([R(pad2(++sec) + '　', { color: ACCENT, bold: true, size: 22 }), R(t, { bold: true, size: 28, color: INK })],
       { spacing: { before: 420, after: 160 }, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: LINE, space: 4 } } });
@@ -1646,7 +2038,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
         rows.push(new TableRow({ cantSplit: true, children: [
           cell([P([R(String(notes.indexOf(n) + 1), { bold: true, color: MUTED })])], 6, i % 2 ? shade('FCFBFF') : {}),
           cell([P(sh ? [new ImageRun({ data: bytes(sh.url), transformation: { width: w, height: Math.round(w * sh.h / sh.w) } })] : [R('（無截圖）', { color: MUTED, size: 17 })])], 38, i % 2 ? shade('FCFBFF') : {}),
-          cell([P([R(tcOfFrame(n.frame), { bold: true, font: mono, size: 21, color: INK })], { spacing: { after: 80 } }),
+          cell([P([R(tcRange(n), { bold: true, font: mono, size: 21, color: INK })], { spacing: { after: 80 } }),
             P(lines(n.text, { size: 21, color: INK })), subLine(n)], 40, i % 2 ? shade('FCFBFF') : {}),
           cell([P([statusRun(n)])], 16, i % 2 ? shade('FCFBFF') : {}),
         ] }));
@@ -1808,16 +2200,203 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   });
 
   // pick up outside reviewers' new notes while the owner has the video open
-  const sig = list => JSON.stringify(list.map(n => [n.id, n.text, n.done, n.cat]).sort());
+  const sig = list => JSON.stringify(list.map(n => [n.id, n.text, n.done, n.cat, n.decision, n.t2, n.replies?.length]).sort());
   async function syncNotes() {
-    if (api.mode !== 'owner' || !project.remote || editing || document.hidden || document.activeElement?.isContentEditable) return;
+    if (!server() || !project.remote || editing || replyOpen || document.hidden || document.activeElement?.isContentEditable) return;
     const id = project.remote;
     try {
-      const { notes: fresh } = await api.req(`/videos/${encodeURIComponent(id)}/notes`);
+      const { notes: fresh } = await api.req(notesPath());
       if (editing || id !== project.remote || sig(fresh) === sig(notes)) return;
       notes = fresh.sort(byTime); render();
     } catch {}
   }
+
+  // ---------- versions: carry the previous cut's open notes over, compare side by side ----------
+  // 20261018_夏日新品_形象片_v2.mp4 → family 夏日新品_形象片, v2 (same rule as lib/core.js)
+  function versionOf(name) {
+    const m = String(name || '').replace(/\.[^.]+$/, '').replace(/^\d{8}_/, '').match(/^(.+?)[_ -]?v(\d+)$/i);
+    return m ? { family: m[1], v: +m[2] } : null;
+  }
+  function localVersions() {
+    const me = versionOf(videoName);
+    if (!me) return null;
+    const copied = new Set(notes.map(n => n.carried?.id).filter(Boolean)), previous = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k.startsWith('vrn.notes.') || k === videoKey) continue;
+        const saved = store.get(k, null), v = versionOf(saved?.name);
+        if (!v || v.family !== me.family || v.v >= me.v) continue;
+        const open = (saved.notes || []).filter(isOpen);
+        previous.push({ id: k, name: saved.name, v: v.v, open: open.length, remaining: open.filter(n => !copied.has(n.id)).length,
+          carried: notes.filter(n => n.carried?.video === k).length, inFolder: false });
+      }
+    } catch {}
+    return { current: me, previous: previous.sort((a, b) => b.v - a.v) };
+  }
+  async function loadVersions() {
+    versions = null; $('#verBar').hidden = true;
+    if (api.mode === 'owner' && project.remote) {
+      const id = project.remote;
+      try {
+        const r = await api.req(`/videos/${encodeURIComponent(id)}/versions`);
+        if (id !== project.remote) return;
+        versions = r;
+      } catch { return; }
+    } else if (api.mode === 'local' && videoKey) versions = localVersions();
+    renderVersions();
+  }
+  function renderVersions() {
+    const bar = $('#verBar'), prev = versions?.previous?.[0];
+    bar.hidden = !prev;
+    if (!prev) return;
+    bar.innerHTML = `<span class="iconLabel">${ic('layers')}<span>這是 <b>v${versions.current.v}</b>。上一版 v${prev.v}
+        ${prev.open ? `還有 <b>${prev.open}</b> 則沒完成` : '的意見都處理完了'}${prev.carried ? `，已帶入 ${prev.carried} 則` : ''}。</span></span>
+      <span class="spacer" style="flex:1"></span>
+      ${prev.remaining ? `<button class="small primary" data-carry="${esc(prev.id)}">把 ${prev.remaining} 則帶到這一版</button>` : ''}
+      ${prev.inFolder ? `<button class="small" data-cmp="${esc(prev.id)}">${ic('compare')}${cmpOn ? '結束對照' : `和 v${prev.v} 對照`}</button>` : ''}`;
+  }
+  $('#verBar').addEventListener('click', async e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const prev = versions?.previous?.find(x => x.id === (b.dataset.carry || b.dataset.cmp));
+    if (!prev) return;
+    if (b.dataset.cmp) { setCompare(cmpOn ? null : prev); renderVersions(); return; }
+    b.disabled = true;
+    try {
+      let added = 0;
+      if (project.remote) {
+        const r = await api.req(`/videos/${encodeURIComponent(project.remote)}/carry`, { method: 'POST', json: { from: prev.id } });
+        added = r.added; notes = r.notes.sort(byTime);
+      } else {
+        const have = new Set(notes.map(n => n.carried?.id).filter(Boolean));
+        for (const n of (store.get(prev.id, null)?.notes || []).filter(isOpen)) {
+          if (have.has(n.id)) continue;
+          notes.push({ ...n, id: crypto.randomUUID?.() || String(Date.now() + added), done: false,
+            carried: { video: prev.id, id: n.id, v: prev.v, name: prev.name } });
+          added++;
+        }
+        notes.sort(byTime); save();
+      }
+      render(); toast(`已把 v${prev.v} 的 ${added} 則意見帶到這一版，時間碼請對照新版確認`);
+      loadVersions();
+    } catch (err) { toast('帶入失敗：' + err.message); b.disabled = false; }
+  });
+  // side by side: the previous version (muted) follows the current one's playhead
+  function setCompare(prev) {
+    const cv = $('#cmpVideo');
+    cmpOn = prev || null;
+    $('#stage').classList.toggle('cmp', !!cmpOn);
+    cv.hidden = !cmpOn;
+    if (cmpOn) { cv.src = api.media(prev.id); cv.playbackRate = video.playbackRate; cv.currentTime = video.currentTime; }
+    else if (cv.getAttribute('src')) { cv.removeAttribute('src'); cv.load(); }
+    refreshPt();
+  }
+  function syncCompare(force) {
+    const cv = $('#cmpVideo');
+    if (!cmpOn || !cv.readyState) return;
+    if (cv.playbackRate !== video.playbackRate) cv.playbackRate = video.playbackRate;
+    if (force || Math.abs(cv.currentTime - video.currentTime) > 0.25) cv.currentTime = Math.min(video.currentTime, cv.duration || Infinity);
+    if (video.paused !== cv.paused) video.paused ? cv.pause() : cv.play().catch(() => {});
+  }
+  for (const ev of ['play', 'pause', 'seeked']) video.addEventListener(ev, () => syncCompare(ev === 'seeked'));
+  $('#cmpVideo').addEventListener('loadedmetadata', () => { syncCompare(true); refreshPt(); });
+  $('#cmpVideo').addEventListener('error', () => { if (cmpOn) { toast('上一版的影片打不開，可能已移出審片資料夾'); setCompare(null); renderVersions(); } });
+  function placeTags() {
+    const show = !!cmpOn && !$('#playerWrap').hidden, sr = $('#stage').getBoundingClientRect();
+    for (const [tag, el, text] of [['#vtagMain', video, `v${versions?.current?.v ?? ''} 這一版`], ['#vtagCmp', $('#cmpVideo'), `v${cmpOn?.v ?? ''} 上一版`]]) {
+      const t = $(tag);
+      t.hidden = !show;
+      if (!show) continue;
+      t.textContent = text;
+      t.style.left = (el.getBoundingClientRect().left - sr.left + 10) + 'px';
+    }
+  }
+
+  // ---------- AI summary: open notes → to-do list, duplicates, conflicts, questions ----------
+  // Same prompt and schema as lib/ai.js (used here in the single-device mode, where the browser calls Claude directly).
+  const SUMMARY_SYSTEM = `你是台灣影片後製團隊的審片助理。使用者會給你一支影片目前所有未完成的修改意見，每則有編號、時間碼、來源（「你」是剪接師本人，其他名字是客戶）、類別和內容。
+
+請整理成剪接師可以直接開工的清單：
+- todo：合併成具體的待辦事項，依影片時間順序排列。意思相同的意見合併成一項，refs 列出所有相關編號。detail 寫清楚改哪裡、改成什麼。priority：會影響播出或客戶明確要求的是 high，一般修改是 normal，可有可無的是 low。
+- duplicates：內容重複或幾乎相同的意見（至少兩則）。
+- conflicts：互相矛盾的要求，例如一則說加快、一則說放慢；特別注意客戶和「你」之間的矛盾。note 說明衝突在哪裡。
+- questions：內容不清楚、需要先確認才能動手的地方，包含原文標了【待確認】的。
+- summary：一兩句話說明整體狀況。
+只根據提供的意見整理，不要加入新的修改建議。使用繁體中文（台灣用語），英文術語保留原文。沒有的項目給空陣列。`;
+  const REFS = { type: 'array', items: { type: 'integer' } };
+  const SUMMARY_SCHEMA = {
+    type: 'object', additionalProperties: false, required: ['summary', 'todo', 'duplicates', 'conflicts', 'questions'],
+    properties: {
+      summary: { type: 'string' },
+      todo: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['title', 'detail', 'refs', 'priority'],
+        properties: { title: { type: 'string' }, detail: { type: 'string' }, refs: REFS, priority: { type: 'string', enum: ['high', 'normal', 'low'] } } } },
+      duplicates: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['refs', 'note'], properties: { refs: REFS, note: { type: 'string' } } } },
+      conflicts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['refs', 'note'], properties: { refs: REFS, note: { type: 'string' } } } },
+      questions: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['refs', 'question'], properties: { refs: REFS, question: { type: 'string' } } } },
+    },
+  };
+  let lastSummary = null;
+  $('#btnSummary').onclick = async () => {
+    const open = notes.filter(isOpen);
+    if (!open.length) return toast('沒有未完成的意見可以彙整');
+    if (!server() && !settings.anKey) { toast('請先到「設定」填入 Anthropic API Key'); openSettings(); return; }
+    const items = open.map(n => ({ no: notes.indexOf(n) + 1, tc: label(n), source: isClient(n) ? (n.by || '客戶') : '你', cat: n.cat || '', text: n.text,
+      decision: n.decision ? DECISION[n.decision] + (n.decisionNote ? '：' + n.decisionNote : '') : '' }));
+    $('#sumBody').innerHTML = `<p class="muted">正在整理 ${open.length} 則意見…（約 10–40 秒）</p>`;
+    $('#sumDlg').showModal();
+    try {
+      let out;
+      if (server()) out = (await api.req('/summary', { method: 'POST', json: { videoName, items } })).summary;
+      else {
+        const line = i => `#${i.no}｜${i.tc}｜來源：${i.source}｜${i.cat}\n${i.text}` + (i.decision ? `\n（剪接師的決定：${i.decision}）` : '');
+        const model = settings.polishModel;
+        const msg = await (await claudeClient()).beta.messages.create({
+          model, max_tokens: 16000,
+          output_config: { effort: 'medium', format: { type: 'json_schema', schema: SUMMARY_SCHEMA } },
+          ...(model === 'claude-haiku-5-5' ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }),
+          system: SUMMARY_SYSTEM,
+          messages: [{ role: 'user', content: `影片：${videoName}\n\n${items.map(line).join('\n\n')}` }],
+        });
+        if (msg.stop_reason === 'refusal') throw new Error('模型拒絕處理這段內容');
+        out = JSON.parse(msg.content.filter(b => b.type === 'text').map(b => b.text).join(''));
+      }
+      lastSummary = out; renderSummary(out);
+    } catch (err) {
+      $('#sumBody').innerHTML = `<p style="color:var(--rec)">彙整失敗：${esc(err.error?.error?.message || err.message)}</p>`;
+    }
+  };
+  const refBtns = refs => (refs || []).map(r => `<button class="chip ref" data-ref="${+r}">#${+r}</button>`).join('');
+  function renderSummary(o) {
+    const PRI = { high: '優先', normal: '', low: '可選' };
+    const sec = (title, list, row) => list?.length ? `<h4>${title}（${list.length}）</h4><ol>${list.map(x => `<li>${row(x)}</li>`).join('')}</ol>` : '';
+    $('#sumBody').innerHTML = `<p>${esc(o.summary)}</p>`
+      + sec('待辦清單', o.todo, t => `${PRI[t.priority] ? `<span class="pri-${t.priority}">【${PRI[t.priority]}】</span>` : ''}<b>${esc(t.title)}</b>${refBtns(t.refs)}<div class="detail">${esc(t.detail)}</div>`)
+      + sec('互相矛盾', o.conflicts, c => `${esc(c.note)}${refBtns(c.refs)}`)
+      + sec('重複的意見', o.duplicates, d => `${esc(d.note)}${refBtns(d.refs)}`)
+      + sec('需要先確認', o.questions, q => `${esc(q.question)}${refBtns(q.refs)}`);
+  }
+  $('#sumBody').addEventListener('click', e => {
+    const n = notes[+e.target.closest('[data-ref]')?.dataset.ref - 1];
+    if (!n) return;
+    $('#sumDlg').close();
+    video.pause(); activeId = n.id;
+    if (!n.general) seekFrame(n.frame);
+    render(); refreshPt();
+    document.querySelector(`.note[data-id="${CSS.escape(n.id)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  $('#sumClose').onclick = () => $('#sumDlg').close();
+  $('#sumCopy').onclick = () => {
+    const o = lastSummary;
+    if (!o) return;
+    const refs = r => r?.length ? `（${r.map(x => '#' + x).join('、')}）` : '';
+    const part = (title, list, row) => list?.length ? `\n${title}\n${list.map((x, i) => `${i + 1}. ${row(x)}`).join('\n')}\n` : '';
+    copyText(`【${videoName}】AI 彙整\n${o.summary}\n`
+      + part('待辦清單', o.todo, t => `${t.priority === 'high' ? '【優先】' : t.priority === 'low' ? '【可選】' : ''}${t.title}${refs(t.refs)}：${t.detail}`)
+      + part('互相矛盾', o.conflicts, c => c.note + refs(c.refs))
+      + part('重複的意見', o.duplicates, d => d.note + refs(d.refs))
+      + part('需要先確認', o.questions, q => q.question + refs(q.refs)));
+  };
 
   // ---------- first-visit tour ----------
   const TOURS = {
@@ -1899,6 +2478,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     $('#who').textContent = `${info.name}・審片`;
     video.src = api.media(info.video.id);
     openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: info.notes });
+    setInterval(syncNotes, 20e3);
     maybeTour();
   }
   async function init() {

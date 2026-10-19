@@ -5,9 +5,9 @@ import { getConfig } from '../../lib/db.js';
 import { videoInFolder, streamVideo } from '../../lib/google.js';
 import { transcribe, polish } from '../../lib/ai.js';
 import { resolveShare, who } from '../../lib/share.js';
-import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday } from '../../lib/core.js';
+import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply } from '../../lib/core.js';
 
-const forGuest = notes => notes.map(({ decision, decisionNote, ...n }) => n);
+const forGuest = notes => notes.map(({ decision, decisionNote, carried, origAuthor, ...n }) => n);
 
 const api = handle(async ({ request, env, params, waitUntil }) => {
   const url = new URL(request.url);
@@ -40,6 +40,12 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
     if (method === 'PUT') { await putNote(d, share.video, m[1], await body(request), me); return json({ ok: true }); }
     if (method === 'DELETE') { await deleteNote(d, share.video, m[1], me); return json({ ok: true }); }
   }
+  if ((m = path.match(/^\/notes\/([\w-]+)\/replies$/)) && method === 'POST') {
+    const reply = await addReply(d, share.video, m[1], (await body(request)).text, me);
+    waitUntil(notify(d, env, 'reply', `${share.label} 在「${share.video_name}」回覆：${reply.text.slice(0, 60)}`, share.id));
+    return json({ reply });
+  }
+  if ((m = path.match(/^\/replies\/([\w-]+)$/)) && method === 'DELETE') { await deleteReply(d, share.video, m[1], me); return json({ ok: true }); }
 
   if (path === '/status' && method === 'POST') {
     const { status } = await body(request);

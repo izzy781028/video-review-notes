@@ -3,8 +3,9 @@ import { HttpError, json, handle, body, randomId } from '../../lib/http.js';
 import { db, getConfig, setKv, getKv, DEFAULT_CONFIG } from '../../lib/db.js';
 import { ownerEmail } from '../../lib/auth.js';
 import { folderId, listVideos, videoInFolder, streamVideo } from '../../lib/google.js';
-import { transcribe, polish } from '../../lib/ai.js';
-import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, usedToday, addAllowance, dailyLimit } from '../../lib/core.js';
+import { transcribe, polish, summarize } from '../../lib/ai.js';
+import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, usedToday, addAllowance, dailyLimit,
+  addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf } from '../../lib/core.js';
 
 const OWNER = { author: 'owner' };
 
@@ -29,6 +30,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   // Drive folder listing, with note counts, new guest notes since the owner last looked, and review status.
   if (path === '/videos' && method === 'GET') {
     const files = await listVideos(env);
+    await rememberNames(d, files);
     const seen = await getKv(d, 'seen', {});
     const { results } = await d.prepare('SELECT video, author, updated FROM notes').all();
     const { results: infos } = await d.prepare("SELECT k, v FROM kv WHERE k LIKE 'video:%'").all();
@@ -51,6 +53,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
     const id = m[1];
     if (method === 'GET') {
       const meta = await videoInFolder(env, id);
+      await rememberNames(d, [{ id, name: meta.name }]);
       const seen = await getKv(d, 'seen', {});
       seen[id] = Date.now();
       await setKv(d, 'seen', seen);
@@ -66,6 +69,30 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   }
 
   if ((m = path.match(/^\/videos\/([\w-]+)\/notes$/)) && method === 'GET') return json({ notes: await listNotes(d, m[1]) });
+
+  // earlier versions of the same video (same name, lower _vN), and carrying their open notes over
+  if ((m = path.match(/^\/videos\/([\w-]+)\/versions$/)) && method === 'GET') {
+    const meta = await videoInFolder(env, m[1]);
+    const inFolder = new Set((await listVideos(env)).map(f => f.id));
+    return json({ current: versionOf(meta.name), previous: await previousVersions(d, m[1], meta.name, inFolder) });
+  }
+  if ((m = path.match(/^\/videos\/([\w-]+)\/carry$/)) && method === 'POST') {
+    const meta = await videoInFolder(env, m[1]);
+    const { from } = await body(request), names = await getKv(d, 'names', {});
+    const a = versionOf(meta.name), b = versionOf(names[from]);
+    if (!a || !b || a.family !== b.family || b.v >= a.v) throw new HttpError(400, '只能從同一支影片的舊版本帶入意見');
+    const added = await carryNotes(d, m[1], from, names[from]);
+    return json({ added, notes: await listNotes(d, m[1]) });
+  }
+
+  if ((m = path.match(/^\/videos\/([\w-]+)\/notes\/([\w-]+)\/replies$/)) && method === 'POST') {
+    const config = await getConfig(d);
+    return json({ reply: await addReply(d, m[1], m[2], (await body(request)).text, { author: 'owner', name: config.reviewer || '你' }) });
+  }
+  if ((m = path.match(/^\/videos\/([\w-]+)\/replies\/([\w-]+)$/)) && method === 'DELETE') {
+    await deleteReply(d, m[1], m[2], OWNER);
+    return json({ ok: true });
+  }
 
   // Every open (not done) note across the folder's videos, flagged new when changed after `since`.
   // Screenshots are left out unless thumbs=1, so the local Claude helper gets a small, readable payload.
@@ -159,6 +186,8 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   }
   if (path === '/polish' && method === 'POST')
     return json({ text: await polish(env, await getConfig(d), await body(request)) });
+  if (path === '/summary' && method === 'POST')
+    return json({ summary: await summarize(env, await getConfig(d), await body(request)) });
 
   throw new HttpError(404, '找不到這個功能');
 });
