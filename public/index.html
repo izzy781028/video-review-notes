@@ -333,7 +333,18 @@
   .dots i.on { background: var(--accent); }
   .shareRow { border: 1px solid var(--glass-border); background: var(--glass-flat); border-radius: 16px; padding: 10px 12px; margin-top: 8px; color: var(--ink-2); }
   #shareMsg { width: 100%; min-height: 110px; }
-  body.guest .ownerOnly, body:not(.server) .serverOnly, body.server .localOnly, body:not(.owner) .ownerSrv { display: none !important; }
+  body.guest .ownerOnly, body:not(.server) .serverOnly, body.server .localOnly, body:not(.owner) .ownerSrv, body:not(.guest) .guestOnly { display: none !important; }
+  /* outside reviewers get the essentials: voice, text, overall note, tap to mark a spot */
+  body.guest .viewTools, body.guest .kbdhint, body.guest #fpsBadge, body.guest button kbd, body.guest .listTools,
+  body.guest #drawTools, body.guest #btnUndoDraw, body.guest #btnOut, body.guest #btnOutClear,
+  body.guest .transport [data-step="-1f"], body.guest .transport [data-step="+1f"] { display: none !important; }
+  .chip.unsent { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+  #btnSubmit { font-weight: 600; }
+  #prevNotes { margin: 0 0 12px; padding: 10px 12px; border-radius: 18px; background: var(--glass-flat); border: 1px solid var(--glass-border); }
+  #prevNotes summary { cursor: pointer; font-weight: 600; }
+  #prevNotes .pnote { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  #prevNotes .pnote:first-of-type { border-top: 0; margin-top: 6px; }
+  #prevNotes .pnote .reps { grid-column: 2 / -1; font-size: 12px; color: var(--ink-2); }
   /* ---------- phone ---------- */
   @media (max-width: 700px) {
     header { margin: 8px 8px 0; padding: 8px 12px; top: max(4px, env(safe-area-inset-top)); }
@@ -366,6 +377,7 @@
     .tools .seg button { flex: 1; padding: 4px 6px; }
     .transport button { min-width: 0; padding: 6px 2px; font-size: 12px; }
     .transport [data-step=prev], .transport [data-step=next] { font-size: 0; gap: 0; }
+    body.guest .transport { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .menu-list { position: fixed; left: 12px; right: 12px; top: auto; }
   }
   @media (pointer: coarse) {
@@ -498,6 +510,7 @@
               <label class="small toggle"><input type="checkbox" id="edGeneral"> 整體意見</label>
             </div>
             <div id="toolsRow" class="bar tools">
+              <span class="small muted iconLabel guestOnly"><i data-ic="target"></i>點一下畫面，可以標出你說的位置</span>
               <span class="seg" id="drawTools" title="在畫面上標出你說的位置">
                 <button data-tool="pt" class="on" title="點一下畫面標出位置"><i data-ic="target"></i>圈選</button>
                 <button data-tool="arrow" title="在畫面上拖曳畫箭頭"><i data-ic="arrow"></i>箭頭</button>
@@ -532,12 +545,14 @@
       <span>審核狀態：<strong id="statusText"></strong></span>
       <span class="spacer" style="flex:1"></span>
       <span class="seg">
+      <button id="btnSubmit" class="guestOnly"><i data-ic="share"></i>送出修改意見</button>
       <button data-status="approved"><i data-ic="checkCircle"></i>核准</button>
-      <button data-status="changes"><i data-ic="pencil"></i>需要修改</button>
+      <button data-status="changes" class="ownerOnly"><i data-ic="pencil"></i>需要修改</button>
       <button data-status="review" class="ownerOnly"><i data-ic="undo"></i>改回待審</button>
       </span>
     </div>
     <div id="verBar" class="bar listBody" hidden></div>
+    <details id="prevNotes" class="listBody" hidden></details>
     <div class="bar" style="margin-top:0; margin-bottom:8px">
       <strong>修改清單</strong><span id="count" class="muted small"></span>
       <span class="spacer" style="flex:1"></span>
@@ -1374,7 +1389,8 @@
   const label = n => n.general ? '整體意見' : tcRange(n);
   const isOpen = n => !n.done && n.decision !== 'reject';
   // a client's note: from a share link (or carried over from one); in the single-device mode, anyone but the reviewer set in 設定
-  const isClient = n => api.mode === 'local' ? !!(n.by && settings.reviewer && n.by !== settings.reviewer) : (n.origAuthor || n.author || 'owner') !== 'owner';
+  const isClient = n => api.mode === 'guest' || (api.mode === 'local' ? !!(n.by && settings.reviewer && n.by !== settings.reviewer)
+    : (n.origAuthor || n.author || 'owner') !== 'owner');
   function avatar(name, client) {
     const s = String(name || '').trim(), ch = s ? (/^[a-z]/i.test(s) ? s[0].toUpperCase() : [...s][0]) : '我';
     return `<span class="av${client ? ' c' : ''}" title="${esc(s || '我')}${client ? '（客戶）' : ''}">${esc(ch)}</span>`;
@@ -1697,6 +1713,13 @@
       .join(' ').toLowerCase().includes(q));
     $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}${shown.length !== notes.length ? `・顯示 ${shown.length}` : ''}` : '';
     $('#railCount').textContent = notes.length; $('#railCount').hidden = !notes.length;
+    if (api.mode === 'guest') {
+      const unsent = notes.filter(n => !n.submitted).length, b = $('#btnSubmit');
+      b.innerHTML = ic('share') + (unsent ? `送出 ${unsent} 則修改意見` : notes.length ? '已全部送出' : '送出修改意見');
+      b.disabled = !unsent;
+      b.classList.toggle('primary', !!unsent);
+      b.title = unsent ? '看完了就按這裡，我們會收到通知' : notes.length ? '新增或修改意見後，可以再送出一次' : '先留下要修改的地方，再按送出';
+    }
     $('#list').innerHTML = shown.length ? shown.map(n => `
       <div class="note${n.done ? ' done' : ''}${n.general ? ' general' : ''}${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
         <img src="${n.thumb || ''}" data-act="seek" alt="">
@@ -1706,6 +1729,7 @@
             <span class="chip">#${notes.indexOf(n) + 1}</span>
             ${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}
             <span class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}</span>
+            ${server() && isClient(n) && !n.submitted && !n.carried ? `<span class="chip unsent" title="${api.mode === 'guest' ? '按上方「送出修改意見」後我們才會收到通知' : '客戶還沒按「送出」，可能還在看'}">未送出</span>` : ''}
           </div>
           ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 v${esc(n.carried.v ?? '')} 帶入・時間碼可能已隨剪接變動</div>` : ''}
           <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
@@ -2291,10 +2315,35 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     } catch (err) { toast(err.message); }
   });
 
+  // 送出: the client is done; the owner gets one notification with the count
+  $('#btnSubmit').onclick = async () => {
+    const unsent = notes.filter(n => !n.submitted).length;
+    if (!unsent || !confirm(`送出 ${unsent} 則修改意見？送出後我們會收到通知，之後還可以再補充。`)) return;
+    $('#btnSubmit').disabled = true;
+    try {
+      const r = await api.req('/submit', { method: 'POST' });
+      notes = r.notes.sort(byTime); project.info = r.info;
+      render(); renderStatus();
+      toast(`已送出 ${r.sent} 則意見，謝謝！我們會收到通知。`);
+    } catch (err) { toast(err.message); render(); }
+  };
+  // a client's notes on earlier versions of this video: read-only, with whether each one was fixed
+  function renderPrevious(prev) {
+    const box = $('#prevNotes');
+    box.hidden = !prev?.length;
+    if (box.hidden) return;
+    const all = prev.flatMap(x => x.notes), done = all.filter(n => n.fixed).length;
+    const tc = n => n.general ? '整體' : tcOf(n.t) + (n.t2 != null ? ' → ' + tcOf(n.t2) : '');
+    box.innerHTML = `<summary>上一版你的 ${all.length} 則意見：已修改 ${done} 則</summary>`
+      + prev.map(x => x.notes.map(n => `<div class="pnote"><span class="mono small muted">v${x.v} ${tc(n)}</span><span>${esc(n.text)}</span>
+          <span class="chip ${n.fixed ? 'st-approved' : ''}">${n.fixed ? '已修改' : '處理中'}</span>
+          ${n.replies?.length ? `<div class="reps">${n.replies.map(r => `↳ <b>${esc(r.by || '')}</b>：${esc(r.text)}`).join('<br>')}</div>` : ''}</div>`).join('')).join('');
+  }
+
   // ---------- share links for outside reviewers (owner) ----------
   const shareUrl = token => `${location.origin}/s/#t=${token}`;
   const shareMessage = (label, token, expires, hasPin) =>
-    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言：\n${shareUrl(token)}\n（連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
+    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」：\n${shareUrl(token)}\n（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); toast('已複製，可以貼給對方了'); } catch { prompt('請複製這段文字：', t); }
   }
@@ -2337,7 +2386,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       box.innerHTML = shares.length ? shares.map(sh => {
         const last = sh.recent[0], expired = sh.expires < Date.now();
         return `<div class="shareRow" data-id="${esc(sh.id)}" data-token="${esc(sh.token)}" data-label="${esc(sh.label)}" data-expires="${sh.expires}" data-pin="${sh.pin ? 1 : ''}">
-          <strong>${esc(sh.label)}</strong>
+          <strong>${esc(sh.label)}</strong>${sh.madeFor && sh.madeFor !== videoName ? `<span class="small muted">（在 ${esc(sh.madeFor)} 分享，會自動開最新版）</span>` : ''}
           ${expired ? '<span class="chip fresh">已過期</span>' : `<span class="chip">到 ${new Date(sh.expires).toLocaleDateString('zh-TW')}</span>`}
           ${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
           <div>${sh.opens ? `打開 ${sh.opens} 次・最近 ${new Date(last.at).toLocaleString('zh-TW')}${last.place ? '・' + esc(last.place) : ''}・${esc(deviceOf(last.ua))}` : '對方還沒打開'}</div>
@@ -2596,7 +2645,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       ['playCircle', '歡迎！', '這支影片分享給你審片。播放影片，看到想修改的地方就按暫停。'],
       ['mic', '用說的或打字', '按下方「語音意見」直接說，或按「文字意見」打字。點一下畫面，可以標出你說的位置。'],
       ['sparkle', '自動整理成清楚的說明', '你說的話會整理成清楚的修改說明，看一下沒問題就按「儲存」。'],
-      ['checkCircle', '看完了嗎？', '在「修改清單」上方按「核准」或「需要修改」，我們就會收到通知。'],
+      ['checkCircle', '看完了嗎？', '按「修改清單」上方的「送出修改意見」，我們就會收到通知；沒有要改的話，按「核准」。'],
     ],
   };
   let tour = { steps: [], i: 0 };
@@ -2664,6 +2713,8 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     $('#who').textContent = `${info.name}・審片`;
     video.src = probeSrc = api.media(info.video.id);
     openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: info.notes });
+    renderPrevious(info.previous);
+    if (info.newer && info.previous?.length) toast('這是修改後的新版本，上一版的意見和處理狀態在清單上方。');
     setInterval(syncNotes, 20e3);
     maybeTour();
   }

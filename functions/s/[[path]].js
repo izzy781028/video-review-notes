@@ -2,10 +2,11 @@
 // Cloudflare Access is bypassed for /s; the share token (plus optional PIN / device lock) is the gate.
 import { HttpError, json, handle, body } from '../../lib/http.js';
 import { getConfig } from '../../lib/db.js';
-import { videoInFolder, streamVideo } from '../../lib/google.js';
+import { videoInFolder, streamVideo, listVideos } from '../../lib/google.js';
 import { transcribe, polish } from '../../lib/ai.js';
 import { resolveShare, who } from '../../lib/share.js';
-import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply } from '../../lib/core.js';
+import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply,
+  rememberNames, followLatest, earlierNotes, submitNotes } from '../../lib/core.js';
 
 const forGuest = notes => notes.map(({ decision, decisionNote, carried, origAuthor, ...n }) => n);
 
@@ -20,6 +21,10 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
   let m;
 
   if (path === '/info' && method === 'GET') {
+    // the link opens the newest version of its video
+    const files = await listVideos(env).catch(() => null);
+    let followed = false;
+    if (files) { await rememberNames(d, files); followed = await followLatest(d, share, files); }
     const meta = await videoInFolder(env, share.video);
     const config = await getConfig(d);
     await d.prepare('INSERT INTO opens (share, at, ua, place) VALUES (?, ?, ?, ?)')
@@ -31,6 +36,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
       config: { autoPolish: config.autoPolish, polishImage: config.polishImage },
       limit: dailyLimit(env), used: await usedToday(d, share.id),
       notes: forGuest(await listNotes(d, share.video, me.author)),
+      previous: await earlierNotes(d, share, me.author), newer: followed || share.video !== share.origVideo,
     }));
   }
   if (path === '/media') return withCookies(await streamVideo(env, share.video, request));
@@ -46,6 +52,15 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
     return json({ reply });
   }
   if ((m = path.match(/^\/replies\/([\w-]+)$/)) && method === 'DELETE') { await deleteReply(d, share.video, m[1], me); return json({ ok: true }); }
+
+  if (path === '/submit' && method === 'POST') {
+    const { total, sent } = await submitNotes(d, share.video, me.author);
+    if (!total) throw new HttpError(400, '還沒有任何意見。沒有要修改的話，請按「核准」。');
+    if (!sent) throw new HttpError(400, '意見都已經送出了。');
+    const info = await patchVideo(d, share.video, { status: 'changes', statusBy: share.label, statusAt: Date.now() });
+    waitUntil(notify(d, env, 'submit', `${share.label} 送出 ${sent} 則修改意見：「${share.video_name}」`, share.id));
+    return json({ info, sent, notes: forGuest(await listNotes(d, share.video, me.author)) });
+  }
 
   if (path === '/status' && method === 'POST') {
     const { status } = await body(request);

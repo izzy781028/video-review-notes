@@ -137,12 +137,16 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   if ((m = path.match(/^\/videos\/([\w-]+)\/shares$/))) {
     const video = m[1];
     if (method === 'GET') {
+      // links made for any version of this video (they all follow to the newest one)
+      const names = await getKv(d, 'names', {}), me = versionOf(names[video]);
+      const ids = [...new Set([video, ...(me ? Object.keys(names).filter(id => versionOf(names[id])?.family === me.family) : [])])];
       const { results } = await d.prepare(`SELECT s.*, (SELECT COUNT(*) FROM opens o WHERE o.share = s.id) AS opens
-        FROM shares s WHERE s.video = ? AND s.revoked = 0 ORDER BY s.created DESC`).bind(video).all();
+        FROM shares s WHERE s.video IN (${ids.map(() => '?').join(',')}) AND s.revoked = 0 ORDER BY s.created DESC`).bind(...ids).all();
       const shares = [];
       for (const s of results) {
         const last = await d.prepare('SELECT at, ua, place FROM opens WHERE share = ? ORDER BY at DESC LIMIT 5').bind(s.id).all();
         shares.push({ id: s.id, label: s.label, token: s.token, pin: s.pin, lockDevice: !!s.lock_device, created: s.created,
+          madeFor: s.video_name, follows: !!me,
           expires: s.expires, opens: s.opens, recent: last.results, used: await usedToday(d, s.id) });
       }
       return json({ shares, limit: dailyLimit(env) });
