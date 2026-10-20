@@ -151,10 +151,32 @@
    - 「invalid_grant / 金鑰錯誤」→ `GOOGLE_SERVICE_ACCOUNT` 沒有貼完整 JSON。
 3. 打開影片 → 暫停 → 打字留一則意見。
 4. 按麥克風講一句話 → 確認轉出繁體中文（測 ElevenLabs）。
-5. 按「AI 潤飾」→ 確認有整理結果（測 Anthropic）。錯誤訊息有 `credit balance` 代表還沒儲值。
+5. 按「AI 潤飾」→ 確認有整理結果（測 Anthropic）。錯誤訊息有 `credit balance` 代表還沒儲值；出現 `Request not allowed` 或「不接受這台伺服器所在地區」就做下面的「AI 中繼」。
 6. 匯出 Word 和 PDF 看版面。
 7. 按「分享給外部審片」→ 複製連結 → 用另一支手機、不要登入打開 → 只看得到這一支影片。
 8. 手機打開網站 → 分享 →「加入主畫面」，之後就像 App 一樣開。
+
+---
+
+## 6.5 AI 中繼（AI 潤飾出現 `Request not allowed` 時才需要）
+
+Cloudflare 會用離使用者最近的機房執行片語，台灣連線常常被分到**香港**機房，而 Anthropic 不接受從香港連過去，所以會回 `Request not allowed`（有時成功、有時失敗）。解法是另外建一個很小的 Worker，固定在美國執行，片語的 AI 請求都經過它轉送。它只轉送 AI 請求，不存任何資料，免費方案就夠用。
+
+1. **產生一組通關密碼**：隨便打一串 30 個字以上的英數字（或用密碼管理器產生），先存在自己的記事本，**不要貼到聊天裡**。下面兩個地方要填一樣的值。
+2. **建立 Worker**：Cloudflare 左側「Workers & Pages」→「Create」→ **Workers** 分頁 →「Import a repository」→ 選片語所在的同一個 GitHub repo：
+   - Project name：`clipnote-ai`（必須一樣，和 `ai-proxy/wrangler.toml` 的名稱對應）
+   - Production branch：和片語 Pages 用的同一個分支
+   - Root directory（Advanced settings 裡）：`ai-proxy`；如果片語放在 repo 的子資料夾，就填 `子資料夾/ai-proxy`（例如 `video-review-notes/ai-proxy`）
+   - Build command 留空；Deploy command：`npx wrangler deploy`
+   - 「Deploy」。完成後記下網址：`https://clipnote-ai.<你的帳號>.workers.dev`
+3. Worker →「Settings」→「Variables and Secrets」→「Add」→ Type **Secret**，名稱 `PROXY_TOKEN`，值填第 1 步的密碼 → Deploy。
+4. **確認它在美國**：瀏覽器打開 `https://clipnote-ai.<你的帳號>.workers.dev/check?token=<第 1 步的密碼>`，應該看到 `"loc":"US"`。看到 `HK` 就是位置設定沒生效，把畫面截圖給我。
+5. 回**片語的 Pages 專案** →「Settings」→「Variables and Secrets」新增兩個 Secret：
+   - `ANTHROPIC_BASE_URL`：第 2 步的 Worker 網址（`https://clipnote-ai.…workers.dev`，後面不要加路徑）
+   - `AI_PROXY_TOKEN`：第 1 步的密碼
+6. Pages 專案 →「Deployments」→ 最新一筆「⋯」→ **Retry deployment**。之後再按「AI 潤飾」測試。
+
+要停用中繼：刪掉 Pages 的 `ANTHROPIC_BASE_URL` 和 `AI_PROXY_TOKEN`，再 Retry deployment。
 
 ---
 

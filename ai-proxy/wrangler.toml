@@ -1,0 +1,11 @@
+# 片語 Clipnote — AI relay.
+# Anthropic does not serve some regions (e.g. Hong Kong). Cloudflare Pages runs near the viewer, and
+# visitors from Taiwan are often served from Hong Kong, so the Pages Function's call to Anthropic gets
+# "403 Request not allowed". This tiny Worker is pinned to the US and only relays /v1/messages.
+name = "clipnote-ai"
+main = "index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[placement]
+region = "aws:us-east-1"

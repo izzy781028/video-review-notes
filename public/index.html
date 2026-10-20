@@ -1688,7 +1688,7 @@
       status('已潤飾。可以再手動調整；按「原始口述」可換回原話。');
       $('#edText').focus();
     } catch (err) {
-      status('AI 潤飾失敗：' + (err.error?.error?.message || err.message));
+      status(String(err.error?.error?.message || err.message).replace(/^(AI 潤飾失敗：)?/, 'AI 潤飾失敗：')); // the server message already carries the prefix
     } finally { btn.disabled = false; }
   }
   $('#btnPolish').onclick = polish;
@@ -2612,7 +2612,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       }
       lastSummary = out; renderSummary(out);
     } catch (err) {
-      $('#sumBody').innerHTML = `<p style="color:var(--rec)">彙整失敗：${esc(err.error?.error?.message || err.message)}</p>`;
+      $('#sumBody').innerHTML = `<p style="color:var(--rec)">${esc(String(err.error?.error?.message || err.message).replace(/^(AI 彙整失敗：)?/, 'AI 彙整失敗：'))}</p>`;
     }
   };
   const refBtns = refs => (refs || []).map(r => `<button class="chip ref" data-ref="${+r}">#${+r}</button>`).join('');
