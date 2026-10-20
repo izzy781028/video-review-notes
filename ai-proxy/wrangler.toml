@@ -7,6 +7,7 @@ main = "index.js"
 compatibility_date = "2026-09-01"
 workers_dev = true
 preview_urls = false
+keep_vars = true  # keep variables added in the dashboard
 
 [placement]
 region = "aws:us-east-1"
