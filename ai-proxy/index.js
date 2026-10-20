@@ -13,8 +13,9 @@ const json = (o, status = 200) => new Response(JSON.stringify(o), { status, head
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (!env.PROXY_TOKEN) return json({ error: 'forbidden', why: 'PROXY_TOKEN 尚未設定（Worker → Settings → Variables and Secrets）' }, 403);
     if (!same(request.headers.get('x-clipnote-proxy') || url.searchParams.get('token'), env.PROXY_TOKEN))
-      return json({ error: 'forbidden' }, 403);
+      return json({ error: 'forbidden', why: '密碼和 PROXY_TOKEN 不一致' }, 403);
 
     // GET /check?token=… shows which data center this Worker sends requests from
     if (url.pathname === '/check' && request.method === 'GET') {
