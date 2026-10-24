@@ -275,6 +275,12 @@
   .dItem .th svg { color: #fff; width: 20px; height: 20px; }
   .dItem .nm { font-weight: 600; word-break: break-all; }
   .dItem .sub { font-size: 12px; color: var(--muted); }
+  .dRow { position: relative; flex: none; }
+  .dRow .dItem { padding-right: 48px; }
+  .dDel { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; min-height: 34px !important; padding: 0; display: grid; place-items: center;
+    border-radius: 10px; background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
+  .dDel svg { width: 17px; height: 17px; }
+  .dDel:hover, .dDel:focus-visible { color: var(--rec); background: var(--glass-strong); border-color: var(--glass-border); }
   #printView { display: none; }
   /* point marker on the frame */
   #stage { position: relative; }
@@ -696,6 +702,7 @@
     download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
     upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
     chevron: '<path d="M6 9l6 6 6-6"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
     doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
     image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
     print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
@@ -893,14 +900,14 @@
     $('#drive').hidden = false; $('#drivePath').textContent = '最新的在最上面';
     list.innerHTML = '<div class="small muted">讀取中…</div>';
     try {
-      const { files } = await api.req('/videos');
-      list.innerHTML = files.length ? files.map(f => `<button class="dItem" data-remote="${esc(f.id)}" data-name="${esc(f.name)}">
+      const { files, canDelete } = await api.req('/videos');
+      list.innerHTML = files.length ? files.map(f => `<div class="dRow"><button class="dItem" data-remote="${esc(f.id)}" data-name="${esc(f.name)}">
           <div class="th">${ic('play')}</div>
           <span><span class="nm">${esc(f.name)}</span><br><span class="sub">${[fmtDur(f.videoMediaMetadata?.durationMillis),
             f.videoMediaMetadata?.height ? f.videoMediaMetadata.height + 'p' : '', fmtSize(+f.size),
             new Date(f.modifiedTime).toLocaleDateString('zh-TW')].filter(Boolean).join(' · ')}</span><br>
             ${statusChip(f.status)} ${f.notes ? `<span class="chip">${f.notes} 則意見</span>` : ''} ${f.fresh ? `<span class="chip fresh">${f.fresh} 則新意見</span>` : ''}</span>
-        </button>`).join('') : '<div class="small muted">資料夾裡還沒有影片。把輸出好的影片放進 Google Drive 資料夾，就會出現在這裡。</div>';
+        </button>${canDelete ? `<button class="dDel" data-del="${esc(f.id)}" data-name="${esc(f.name)}" data-notes="${f.notes}" title="移到 Google Drive 垃圾桶" aria-label="刪除 ${esc(f.name)}">${ic('trash')}</button>` : ''}</div>`).join('') : '<div class="small muted">資料夾裡還沒有影片。把輸出好的影片放進 Google Drive 資料夾，就會出現在這裡。</div>';
     } catch (err) {
       list.innerHTML = `<div class="small" style="color:var(--rec)">讀不到影片資料夾：${esc(err.message)}</div>`;
     }
@@ -955,9 +962,20 @@
   $('#driveList').addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.del) return trashRemote(b);
     if (b.dataset.remote) openRemote(b.dataset.remote, b.dataset.name);
     if (b.dataset.file) loadUrl(driveMediaUrl(b.dataset.file), b.dataset.name, 'vrn.notes.gdrive.' + b.dataset.file);
   });
+  async function trashRemote(b) {
+    const { del: id, name } = b.dataset, notes = +b.dataset.notes || 0;
+    if (!confirm(`把「${name}」移到 Google Drive 垃圾桶？\n\n・30 天內可以從 Drive 垃圾桶救回\n・${notes ? `${notes} 則意見會保留在片語裡` : '這支片沒有意見'}\n・這支片的分享連結會打不開`)) return;
+    b.disabled = true;
+    try {
+      await api.req(`/videos/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      b.closest('.dRow').remove();
+      toast(`已移到垃圾桶：${name}`);
+    } catch (err) { b.disabled = false; toast('刪除失敗：' + String(err.message).replace(/^刪除失敗：/, '')); }
+  }
   $('#driveRefresh').onclick = listDrive;
   function openProject(name, key, remote) {
     videoName = name; videoKey = key || '';

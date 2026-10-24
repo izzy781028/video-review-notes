@@ -2,7 +2,7 @@
 import { HttpError, json, handle, body, randomId } from '../../lib/http.js';
 import { db, getConfig, setKv, getKv, DEFAULT_CONFIG } from '../../lib/db.js';
 import { ownerEmail } from '../../lib/auth.js';
-import { folderId, listVideos, videoInFolder, streamVideo } from '../../lib/google.js';
+import { folderId, listVideos, videoInFolder, streamVideo, canTrash, trashVideo } from '../../lib/google.js';
 import { transcribe, polish, summarize } from '../../lib/ai.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, usedToday, addAllowance, dailyLimit,
   addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf } from '../../lib/core.js';
@@ -41,7 +41,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
       f.fresh = rows.filter(r => r.author !== 'owner' && r.updated > (seen[f.id] || 0)).length;
       f.status = status[f.id] || 'review';
     }
-    return json({ files });
+    return json({ files, canDelete: canTrash(env) });
   }
 
   if ((m = path.match(/^\/videos\/([\w-]+)\/media$/))) {
@@ -67,6 +67,8 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
       if (input.status in STATUSES) Object.assign(patch, { status: input.status, statusBy: '你', statusAt: Date.now() });
       return json({ info: await patchVideo(d, id, patch) });
     }
+    // to the Drive trash via the owner's helper; notes stay in the database
+    if (method === 'DELETE') return json({ ok: true, ...await trashVideo(env, id) });
   }
 
   if ((m = path.match(/^\/videos\/([\w-]+)\/notes$/)) && method === 'GET') return json({ notes: await listNotes(d, m[1]) });
