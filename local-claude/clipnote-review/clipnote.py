@@ -60,7 +60,7 @@ def config():
 def api(conf, path, method='GET', body=None):
     if not conf.get('CLIPNOTE_URL'):
         die(f'還沒設定 CLIPNOTE_URL，請編輯 {CONF_DIR / "config.env"}')
-    headers = {'accept': 'application/json'}
+    headers = {'accept': 'application/json', 'user-agent': 'clipnote-cli/1.0'}  # Cloudflare 會擋 Python-urllib 預設 UA（Error 1010）
     if conf.get('CLIPNOTE_TEST_JWT'):  # local testing only
         headers['cf-access-jwt-assertion'] = conf['CLIPNOTE_TEST_JWT']
     else:
