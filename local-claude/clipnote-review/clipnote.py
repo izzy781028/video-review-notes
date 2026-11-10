@@ -13,7 +13,7 @@ Commands (run with --help for options):
   decide VIDEO NOTE accept|adjust|reject [--note TEXT]
   upload FILE [--name NAME] [--proxy] | wait NAME | shot VIDEO NOTE [-o FILE]
 """
-import argparse, base64, json, os, re, shutil, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
+import argparse, base64, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 
 CONF_DIR = Path(os.environ.get('CLIPNOTE_CONFIG_DIR', Path.home() / '.config' / 'clipnote'))
@@ -57,7 +57,7 @@ def config():
     return conf
 
 
-def api(conf, path, method='GET', body=None):
+def api(conf, path, method='GET', body=None, raw_bytes=False):
     if not conf.get('CLIPNOTE_URL'):
         die(f'還沒設定 CLIPNOTE_URL，請編輯 {CONF_DIR / "config.env"}')
     headers = {'accept': 'application/json', 'user-agent': 'clipnote-cli/1.0'}  # Cloudflare 會擋 Python-urllib 預設 UA（Error 1010）
@@ -85,6 +85,8 @@ def api(conf, path, method='GET', body=None):
         die(f'{e.code}：{msg}')
     except urllib.error.URLError as e:
         die(f'連不到片語：{e.reason}')
+    if raw_bytes:
+        return raw
     try:
         return json.loads(raw)
     except ValueError:
@@ -152,6 +154,8 @@ def print_note(n, fps, start, show_new=False):
         print(f"      （從 {n['carried'].get('label') or 'v' + str(n['carried'].get('v', '?'))} 帶入，時間碼可能已隨剪接變動，請對照新版）")
     if n.get('decision'):
         print(f"      → 你的決定：{DECISION.get(n['decision'], n['decision'])}" + (f"：{n['decisionNote']}" if n.get('decisionNote') else ''))
+    if n.get('refs'):
+        print(f"      （附了 {len(n['refs'])} 張參考圖，用 refs 下載後再看）")
     for r in n.get('replies') or []:
         print(f"      ↳ {r.get('by') or '你'}：{str(r.get('text', '')).replace(chr(10), ' ')}")
 
@@ -270,6 +274,19 @@ def cmd_shot(conf, a):
     print(f'截圖存到 {out}')
 
 
+def cmd_refs(conf, a):
+    v = find_video(conf, a.video)
+    note = next((n for n in api(conf, f"/videos/{urllib.parse.quote(v['id'])}")['notes'] if n['id'] == a.note), None)
+    if not note or not note.get('refs'):
+        die('這則意見沒有參考圖')
+    out = Path(a.output or Path(tempfile.gettempdir()) / 'clipnote-refs' / a.note)
+    out.mkdir(parents=True, exist_ok=True)
+    for i, r in enumerate(note['refs'], 1):
+        f = out / f'{i}.jpg'
+        f.write_bytes(api(conf, f"/images/{urllib.parse.quote(r['id'])}", raw_bytes=True))
+        print(f'參考圖 {i}：{f}')
+
+
 def probe(path):
     if not shutil.which('ffprobe'):
         return None
@@ -341,6 +358,7 @@ def main():
     s = sub.add_parser('decide', help='記下使用者對客戶意見的決定'); s.add_argument('video'); s.add_argument('note')
     s.add_argument('decision', choices=['accept', 'adjust', 'reject']); s.add_argument('--note', dest='note_text', help='改法或不改的理由')
     s = sub.add_parser('shot', help='存下一則意見的截圖'); s.add_argument('video'); s.add_argument('note'); s.add_argument('-o', '--output')
+    s = sub.add_parser('refs', help='下載一則意見附的參考圖'); s.add_argument('video'); s.add_argument('note'); s.add_argument('-o', '--output', help='存放的資料夾')
     s = sub.add_parser('upload', help='把審片檔放進雲端資料夾'); s.add_argument('file'); s.add_argument('--name'); s.add_argument('--proxy', action='store_true')
     s = sub.add_parser('wait', help='等檔案同步到片語'); s.add_argument('name'); s.add_argument('--minutes', type=int, default=10)
     a = p.parse_args()

@@ -4,6 +4,7 @@ import { db, getConfig, setKv, getKv, DEFAULT_CONFIG } from '../../lib/db.js';
 import { ownerEmail } from '../../lib/auth.js';
 import { folderId, listVideos, videoInFolder, streamVideo, canTrash, trashVideo } from '../../lib/google.js';
 import { transcribe, polish, summarize } from '../../lib/ai.js';
+import { saveImage, imageResponse, deleteImage } from '../../lib/images.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, usedToday, addAllowance, dailyLimit,
   addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf } from '../../lib/core.js';
 
@@ -72,6 +73,16 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   }
 
   if ((m = path.match(/^\/videos\/([\w-]+)\/notes$/)) && method === 'GET') return json({ notes: await listNotes(d, m[1]) });
+
+  // reference images on notes
+  if ((m = path.match(/^\/videos\/([\w-]+)\/images$/)) && method === 'POST') {
+    await videoInFolder(env, m[1]);
+    return json(await saveImage(d, m[1], 'owner', request));
+  }
+  if ((m = path.match(/^\/images\/([\w-]+)$/))) {
+    if (method === 'GET') return imageResponse(d, m[1]);
+    if (method === 'DELETE') { await deleteImage(d, m[1], { author: 'owner' }); return json({ ok: true }); }
+  }
 
   // earlier versions of the same video (same name, lower _vN), and carrying their open notes over
   if ((m = path.match(/^\/videos\/([\w-]+)\/versions$/)) && method === 'GET') {

@@ -242,6 +242,20 @@
   #sumBody .pri-high { color: var(--rec); font-weight: 700; }
   #sumBody .detail { color: var(--ink-2); font-size: 13px; }
   dialog { border-radius: 24px; background: var(--sheet-bg); color: var(--ink); width: min(560px, calc(100vw - 32px)); padding: 20px; }
+  .refs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .refs .ref { position: relative; width: 64px; height: 64px; flex: none; border-radius: 10px; overflow: hidden; background: var(--glass-flat); border: 1px solid var(--glass-border); }
+  .refs .ref img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+  .refs .ref.pending img { opacity: .45; }
+  .refs .ref.pending::after { content: '上傳中'; position: absolute; inset: auto 0 4px; text-align: center; font-size: 10px; color: var(--ink); }
+  .refs .ref .x { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; min-height: 22px !important; padding: 0; border-radius: 50%;
+    display: grid; place-items: center; font-size: 14px; line-height: 1; background: rgba(20,18,40,.72); color: #fff; border: 0; box-shadow: none; }
+  .note .refs .ref { width: 56px; height: 56px; }
+  #editor.dropping { outline: 2px dashed var(--accent); outline-offset: 4px; }
+  #refDlg { width: min(1100px, calc(100vw - 24px)); padding: 12px; }
+  #refBig { display: block; max-width: 100%; max-height: calc(100vh - 140px); margin: 0 auto; border-radius: 12px; object-fit: contain; }
+  #refDlg .bar { margin-top: 10px; }
+  #refDlg a.btn { display: inline-flex; align-items: center; padding: 7px 14px; border-radius: 12px; color: var(--ink); text-decoration: none;
+    background: var(--glass-strong); border: 1px solid var(--glass-border); }
   dialog::backdrop { background: rgba(40,36,80,.28); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
   dialog label { display: block; margin: 10px 0 4px; font-weight: 600; }
   dialog input, dialog select, dialog textarea { width: 100%; }
@@ -531,11 +545,14 @@
               <button id="btnOutClear" class="ghost small" hidden>取消範圍</button>
             </div>
             <textarea id="edText" placeholder="說出或輸入要修改的地方…"></textarea>
+            <div id="edRefs" class="refs" hidden></div>
             <div id="recStatus" class="small muted"></div>
             <div class="bar edActions">
               <button id="btnRec" class="ghost"><i data-ic="mic"></i>錄音</button>
               <button id="btnPolish" class="ghost" title="用 Claude 把口語整理成具體的修改指示"><i data-ic="sparkle"></i>AI 潤飾</button>
               <button id="btnRaw" class="ghost" hidden title="換回潤飾前的原始口述"><i data-ic="undo"></i>原始口述</button>
+              <button id="btnRef" class="ghost" title="附上參考圖（最多 6 張）。也可以直接貼上，或把圖片拖進來"><i data-ic="image"></i>參考圖</button>
+              <input id="refFile" type="file" accept="image/*" multiple hidden>
               <span class="spacer" style="flex:1"></span>
               <button id="btnCancel" class="ghost" title="Esc">取消</button>
               <button id="btnSave" class="primary" title="Ctrl/⌘ + Enter">儲存</button>
@@ -663,6 +680,11 @@
   <div class="bar"><span class="spacer" style="flex:1"></span><button id="shClose">關閉</button></div>
 </dialog>
 
+<dialog id="refDlg" aria-label="參考圖">
+  <img id="refBig" alt="參考圖">
+  <div class="bar"><button id="refPrev" aria-label="上一張">‹</button><span id="refPos" class="small muted"></span><button id="refNext" aria-label="下一張">›</button>
+    <span class="spacer" style="flex:1"></span><a id="refSave" class="btn" download>下載</a><button id="refClose" class="primary">關閉</button></div>
+</dialog>
 <dialog id="sumDlg">
   <h3 style="margin-top:0" class="iconLabel"><i data-ic="sparkle"></i>AI 彙整</h3>
   <div id="sumBody"></div>
@@ -755,6 +777,7 @@
     store.get('vrn.settings', {}));
 
   let videoName = '', videoKey = '', notes = [], editing = null, activeId = null;
+  let refEdit = { added: new Set(), removed: new Set() }; // reference images uploaded / removed while the editor is open
 
   // ---------- backend: 'local' (keys in this browser), 'owner' (signed in via Cloudflare) or 'guest' (share link) ----------
   const api = {
@@ -778,6 +801,7 @@
   function persist(n) {
     if (!project.remote) return save();
     const { isNew, author, ...data } = n;
+    if (data.refs) data.refs = data.refs.filter(r => !r.pending).map(({ id, w, h }) => ({ id, w, h }));
     api.req(`${notesPath()}/${encodeURIComponent(n.id)}`, { method: 'PUT', json: data }).catch(err => toast('意見沒有存到雲端：' + err.message));
   }
   function unpersist(n) {
@@ -1441,7 +1465,8 @@
     video.pause();
     const ranged = !note && !general && marks.in != null;
     // edit a copy: Cancel leaves the note untouched
-    editing = note ? { ...note, pt: note.pt && { ...note.pt }, shapes: note.shapes?.map(sh => ({ ...sh, pts: sh.pts.map(p => p.slice()) })) }
+    editing = note ? { ...note, pt: note.pt && { ...note.pt }, shapes: note.shapes?.map(sh => ({ ...sh, pts: sh.pts.map(p => p.slice()) })),
+        refs: note.refs?.map(r => ({ ...r })) }
       : { id: crypto.randomUUID?.() || String(Date.now()), t: video.currentTime, frame: frameOf(video.currentTime),
         text: '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
     if (ranged) { // I / O marks: the note covers that range; its picture is the first frame
@@ -1458,6 +1483,7 @@
     $('#edText').value = editing.text;
     $('#recStatus').textContent = '';
     $('#btnRaw').hidden = !editing.raw;
+    refEdit = { added: new Set(), removed: new Set() }; renderEdRefs();
     $('#editor').classList.add('open');
     document.body.classList.add('editing');
     if (matchMedia('(max-width: 700px)').matches) setTimeout(() => { $('#stageSpacer').scrollIntoView({ behavior: 'smooth', block: 'start' }); refreshPt(); }, 50);
@@ -1485,14 +1511,16 @@
   $('#btnOutClear').onclick = () => { if (editing) { delete editing.frame2; delete editing.t2; syncGeneral(); } };
   function closeEditor() {
     if (rec.active) rec.stop(true);
+    refEdit.added.forEach(dropImage); refEdit = { added: new Set(), removed: new Set() };
     editing = null; $('#editor').classList.remove('open'); document.body.classList.remove('editing', 'timed'); document.activeElement?.blur();
     refreshPt();
   }
   function commit() {
     if (!editing) return;
+    if (editing.refs?.some(r => r.pending)) { status('參考圖還在上傳，請稍等一下再儲存。'); return; }
     const text = $('#edText').value.trim();
-    if (!text) { closeEditor(); return; }
-    editing.text = text;
+    if (!text && !editing.refs?.length) { closeEditor(); return; }
+    editing.text = text || '（見參考圖）';
     if (editing.raw === text) delete editing.raw;
     if ($('#edGeneral').checked) {
       Object.assign(editing, { general: true, t: null, frame: null, t2: null, frame2: null, thumb: '', pt: null, shapes: null });
@@ -1504,6 +1532,8 @@
     else { const i = notes.findIndex(n => n.id === editing.id); if (i >= 0) notes[i] = editing; else notes.push(editing); }
     activeId = editing.id;
     notes.sort(byTime);
+    if (!editing.refs?.length) delete editing.refs;
+    refEdit.removed.forEach(dropImage); refEdit = { added: new Set(), removed: new Set() };
     persist(editing); closeEditor(); render();
   }
   $('#btnAddText').onclick = () => { openEditor(); $('#edText').focus(); };
@@ -1534,6 +1564,104 @@
   $('#btnRec').onclick = () => rec.active ? rec.stop() : rec.start();
   $('#btnSave').onclick = commit;
   $('#btnCancel').onclick = closeEditor;
+
+  // ---------- reference images on a note ----------
+  // Shrunk in the browser (long side 1600 px, JPEG), uploaded as soon as they are picked, kept as refs: [{ id, w, h }].
+  // In the single-device mode there is no server, so a smaller copy is kept in the note itself.
+  const MAX_REFS = 6;
+  const refSrc = r => r.src || (api.mode === 'guest' ? `/s/api/images/${encodeURIComponent(r.id)}?t=${encodeURIComponent(api.token)}` : `/api/images/${encodeURIComponent(r.id)}`);
+  const refsHtml = (refs, editable) => (refs || []).map((r, i) => `<span class="ref${r.pending ? ' pending' : ''}">
+      <img src="${esc(refSrc(r))}" data-act="ref" data-i="${i}" alt="參考圖 ${i + 1}" loading="lazy">${editable ? `<button class="x" data-rm="${i}" title="移除這張" aria-label="移除參考圖 ${i + 1}">×</button>` : ''}</span>`).join('');
+  function renderEdRefs() {
+    const box = $('#edRefs'), refs = editing?.refs || [];
+    box.hidden = !refs.length; box.innerHTML = refsHtml(refs, true);
+  }
+  async function shrink(file, max, quality) {
+    let bmp;
+    try { bmp = await createImageBitmap(file); } catch { throw new Error(`「${file.name || '圖片'}」讀不到，請改用 JPG 或 PNG`); }
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close?.();
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', quality));
+    return { blob, w: c.width, h: c.height, url: server() ? '' : c.toDataURL('image/jpeg', quality) };
+  }
+  async function addRefs(files) {
+    if (!editing) return;
+    files = [...files].filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.name || ''));
+    const room = MAX_REFS - (editing.refs?.length || 0);
+    if (!files.length) return;
+    if (room <= 0) { status(`一則意見最多 ${MAX_REFS} 張參考圖。`); return; }
+    if (files.length > room) status(`一則意見最多 ${MAX_REFS} 張，只加入前 ${room} 張。`);
+    const target = editing;
+    await Promise.all(files.slice(0, room).map(async file => {
+      const slot = { id: 'tmp-' + Math.random().toString(36).slice(2), pending: true, src: URL.createObjectURL(file) };
+      (target.refs ||= []).push(slot); if (editing === target) renderEdRefs();
+      try {
+        const img = await shrink(file, server() ? 1600 : 1000, server() ? 0.85 : 0.75);
+        let ref;
+        if (server()) {
+          const path = api.mode === 'guest' ? '/images' : `/videos/${encodeURIComponent(project.remote)}/images`;
+          ref = await api.req(`${path}?w=${img.w}&h=${img.h}`, { method: 'POST', body: img.blob, headers: { 'content-type': 'image/jpeg' } });
+          if (editing === target) refEdit.added.add(ref.id); else dropImage(ref.id); // cancelled while uploading
+        } else ref = { id: 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), w: img.w, h: img.h, src: img.url };
+        const preview = slot.src;
+        Object.keys(slot).forEach(k => delete slot[k]); Object.assign(slot, ref);
+        if (server()) slot.src = preview; else URL.revokeObjectURL(preview); // keep showing the local copy (no reload flash); not saved
+      } catch (err) {
+        target.refs.splice(target.refs.indexOf(slot), 1);
+        status('參考圖沒有加入：' + err.message);
+      }
+      if (editing === target) renderEdRefs();
+    }));
+  }
+  function dropImage(id) {
+    if (server() && id && !id.startsWith('tmp-'))
+      api.req(`/images/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+  }
+  $('#btnRef').onclick = () => $('#refFile').click();
+  $('#refFile').onchange = e => { addRefs(e.target.files); e.target.value = ''; };
+  $('#edRefs').addEventListener('click', e => {
+    const rm = e.target.closest('[data-rm]');
+    if (rm) {
+      const [r] = editing.refs.splice(+rm.dataset.rm, 1);
+      if (refEdit.added.delete(r.id)) dropImage(r.id); else refEdit.removed.add(r.id);
+      renderEdRefs(); return;
+    }
+    const img = e.target.closest('[data-act="ref"]');
+    if (img) openRefs(editing.refs, +img.dataset.i);
+  });
+  // paste a screenshot, or drag pictures onto the editor
+  $('#editor').addEventListener('paste', e => {
+    const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith('image/'));
+    if (files.length && editing) { e.preventDefault(); addRefs(files); }
+  });
+  $('#editor').addEventListener('dragover', e => { if (editing && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); $('#editor').classList.add('dropping'); } });
+  $('#editor').addEventListener('dragleave', e => { if (!$('#editor').contains(e.relatedTarget)) $('#editor').classList.remove('dropping'); });
+  $('#editor').addEventListener('drop', e => {
+    $('#editor').classList.remove('dropping');
+    if (!editing || !e.dataTransfer.files.length) return;
+    e.preventDefault(); addRefs(e.dataTransfer.files);
+  });
+  // viewer
+  let refView = { refs: [], i: 0 };
+  function showRef() {
+    const { refs, i } = refView, r = refs[i];
+    $('#refBig').src = refSrc(r);
+    $('#refPos').textContent = refs.length > 1 ? `${i + 1} / ${refs.length}` : '';
+    $('#refPrev').hidden = $('#refNext').hidden = refs.length < 2;
+    $('#refSave').href = refSrc(r); $('#refSave').download = `參考圖-${i + 1}.jpg`;
+  }
+  function openRefs(refs, i) {
+    if (!refs?.[i] || refs[i].pending) return;
+    refView = { refs, i }; showRef();
+    if (!$('#refDlg').open) $('#refDlg').showModal();
+  }
+  const stepRef = d => { refView.i = (refView.i + d + refView.refs.length) % refView.refs.length; showRef(); };
+  $('#refPrev').onclick = () => stepRef(-1);
+  $('#refNext').onclick = () => stepRef(1);
+  $('#refClose').onclick = () => $('#refDlg').close();
+  $('#refDlg').addEventListener('click', e => { if (e.target === $('#refDlg') || e.target === $('#refBig')) $('#refDlg').close(); });
 
   // ---------- speech ----------
   const rec = {
@@ -1754,6 +1882,7 @@
           </div>
           ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 ${esc(vlabel(n.carried))} 帶入・時間碼可能已隨剪接變動</div>` : ''}
           <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
+          ${n.refs?.length ? `<div class="refs">${refsHtml(n.refs)}</div>` : ''}
           ${n.decision && api.mode !== 'guest' ? `<div class="small decision"><span class="chip ${{ reject: 'fresh', adjust: 'st-changes', accept: 'st-approved' }[n.decision]}">${{ reject: '不改', adjust: '改法調整', accept: '照改' }[n.decision]}</span>${n.decisionNote ? ' ' + esc(n.decisionNote) : ''}</div>` : ''}
           ${n.raw ? `<details class="small muted"><summary>原始口述</summary>${esc(n.raw)}</details>` : ''}
           ${repliesHtml(n)}
@@ -1823,6 +1952,7 @@
     const n = notes.find(n => n.id === el.dataset.id);
     if (act === 'reply') { replyOpen = replyOpen === n.id ? null : n.id; render(); $('#list .replyForm input')?.focus(); return; }
     if (act === 'delReply') { deleteReplyOf(n, btn.dataset.rid); return; }
+    if (act === 'ref') { openRefs(n.refs, +btn.dataset.i); return; }
     if (act === 'seek') { video.pause(); activeId = n.id; if (!n.general) seekFrame(n.frame); render(); refreshPt(); }
     if (act === 'done') { n.done = !n.done; persist(n); render(); }
     if (act === 'edit') { if (!n.general) seekFrame(n.frame); openEditor(n); $('#edText').focus(); }
@@ -1910,6 +2040,10 @@
       e.preventDefault(); e.stopPropagation();
       if (!e.repeat) rec.stop();
       return;
+    }
+    if ($('#refDlg').open) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); stepRef(e.key === 'ArrowLeft' ? -1 : 1); }
+      return; // Escape closes the viewer itself, not the editor behind it
     }
     if (editing && e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
     if (editing && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); return; }
@@ -2077,6 +2211,19 @@
     video.currentTime = back; btn.innerHTML = label0;
     return out;
   }
+  async function refImages() {
+    const out = {}, all = notes.flatMap(n => n.refs || []).filter(r => !r.pending);
+    await Promise.all(all.map(async r => {
+      try {
+        const blob = await (await fetch(refSrc(r), { credentials: 'same-origin' })).blob();
+        const url = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+        let { w, h } = r;
+        if (!w || !h) { const im = new Image(); im.src = url; await im.decode(); w = im.naturalWidth; h = im.naturalHeight; }
+        out[r.id] = { url, w, h };
+      } catch {} // a missing image is left out of the document
+    }));
+    return out;
+  }
   const reviewers = () => [...new Set(notes.map(n => n.by).filter(Boolean))].join('、');
   // ---------- revision document (shared by the HTML / PDF report and the Word file) ----------
   const DECISION = { accept: '照改', adjust: '改法調整', reject: '不改' };
@@ -2120,13 +2267,15 @@
     c.getContext('2d').drawImage(img, 0, 0, px, px);
     return Uint8Array.from(atob(c.toDataURL('image/png').split(',')[1]), ch => ch.charCodeAt(0));
   }
-  async function reportHtml(shots) {
+  async function reportHtml(shots, refImgs = {}) {
     const D = docData(), svg = await brandIcon();
     const logo = svg ? `<img class="logo" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}" alt="">` : '';
     const chip = (t, cls = '') => `<span class="chip ${cls}">${esc(t)}</span>`;
     const status = n => { const [box, t] = D.statusOf(n); return `<span class="st ${n.done ? 'ok' : n.decision === 'reject' ? 'no' : ''}">${box} ${t}</span>`; };
     const extra = n => [n.by ? `<span class="by">${esc(n.by)}</span>` : '', D.decisionOf(n) ? `<span class="dec">處理：${esc(D.decisionOf(n))}</span>` : ''].join('')
       + (n.replies?.length ? `<div class="reps">${n.replies.map(r => `<div>↳ <b>${esc(r.by || '你')}</b>：${esc(r.text)}</div>`).join('')}</div>` : '');
+    const refs = n => { const imgs = (n.refs || []).map(r => refImgs[r.id]).filter(Boolean);
+      return imgs.length ? `<div class="refimgs"><span>參考圖</span>${imgs.map(im => `<img src="${im.url}" alt="">`).join('')}</div>` : ''; };
     let sec = 0;
     const head = t => `<h2><span class="no">${pad2(++sec)}</span>${t}</h2>`;
     return `<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2163,6 +2312,8 @@ thead th:first-child{border-radius:8px 0 0 0}thead th:last-child{border-radius:0
 tbody td{border-bottom:1px solid var(--line);padding:14px 12px;vertical-align:top}
 tbody tr:nth-child(even) td{background:#fcfbff}
 td.n{width:40px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.refimgs{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px;margin-top:8px}.refimgs span{flex-basis:100%;font-size:11.5px;color:var(--muted)}
+.refimgs img{height:96px;max-width:100%;border-radius:6px;border:1px solid var(--line)}
 td.img{width:300px}.shot{position:relative;border-radius:8px;overflow:hidden;background:#0f0c2e;line-height:0}
 .shot img{width:100%;display:block}.shot.tall{width:170px}
 .shot .tc{position:absolute;left:8px;top:8px;line-height:1.5;font:600 12px ui-monospace,Menlo,Consolas,monospace;color:#fff;background:rgba(15,12,46,.82);padding:2px 7px;border-radius:5px}
@@ -2180,12 +2331,12 @@ td.s{width:92px}
 <div class="stats">${D.stats.map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('')}</div>
 ${D.cats.length ? `<div class="cats">${D.cats.map(([k, v]) => chip(`${k}　${v}`, 'n')).join('')}</div>` : ''}
 ${D.general.length ? `${head('整體意見')}<ol class="gen">${D.general.map(n => `<li><span class="idx">#${notes.indexOf(n) + 1}</span>
-  <div><div class="txt">${esc(n.text)}</div><div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></div>${status(n)}</li>`).join('')}</ol>` : ''}
+  <div><div class="txt">${esc(n.text)}</div>${refs(n)}<div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></div>${status(n)}</li>`).join('')}</ol>` : ''}
 ${D.timed.length ? `${head('逐點修改')}<table><thead><tr><th>#</th><th>畫面</th><th>修改內容</th><th>狀態</th></tr></thead><tbody>
 ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   return `<tr><td class="n">${notes.indexOf(n) + 1}</td>
   <td class="img">${sh ? `<div class="shot${tall ? ' tall' : ''}"><img src="${sh.url}" alt=""><span class="tc">${tcOfFrame(n.frame)}</span></div>` : `<div class="tcx">${tcOfFrame(n.frame)}</div>`}</td>
-  <td><div class="tcx">${tcRange(n)}</div><div class="txt">${esc(n.text)}</div><div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></td>
+  <td><div class="tcx">${tcRange(n)}</div><div class="txt">${esc(n.text)}</div>${refs(n)}<div class="sub">${n.cat ? chip(n.cat) : ''}${extra(n)}</div></td>
   <td class="s">${status(n)}</td></tr>`; }).join('')}
 </tbody></table>` : ''}
 <footer class="foot"><span>片語 Clipnote · ${esc(D.title)}</span><span>產出 ${esc(D.meta[4][1])}</span></footer>
@@ -2197,10 +2348,10 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     try { await fn(); } catch (err) { alert('匯出失敗：' + err.message); } finally { btn.disabled = false; }
   }
   $('#btnReport').onclick = e => withBusy(e.currentTarget, async () => {
-    download(base() + '.html', await reportHtml(await captureFrames(e.currentTarget)), 'text/html;charset=utf-8');
+    download(base() + '.html', await reportHtml(await captureFrames(e.currentTarget), await refImages()), 'text/html;charset=utf-8');
   });
   $('#btnPrint').onclick = e => withBusy(e.currentTarget, async () => {
-    const html = await reportHtml(await captureFrames(e.currentTarget));
+    const html = await reportHtml(await captureFrames(e.currentTarget), await refImages());
     $('#printView').innerHTML = html.slice(html.indexOf('<style>'), html.indexOf('</style>') + 8) + html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'));
     await Promise.all([...$('#printView').querySelectorAll('img')].map(i => i.decode?.().catch(() => {})));
     window.print();
@@ -2211,7 +2362,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const btn = e.currentTarget, label0 = btn.innerHTML;
     btn.textContent = '載入中…';
     await loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js').finally(() => { btn.innerHTML = label0; });
-    const shots = await captureFrames(btn);
+    const shots = await captureFrames(btn), refImgs = await refImages();
     const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ImageRun, ShadingType, BorderStyle,
       AlignmentType, VerticalAlign, Header, Footer, PageNumber, TabStopType } = window.docx;
     const D = docData(), logo = await iconPng(96);
@@ -2235,6 +2386,11 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const subLine = n => P([...(n.cat ? [R(n.cat, { color: ACCENT, size: 17 })] : []), ...(n.by ? [R(`　${n.by}`, { color: MUTED, size: 17 })] : []),
       ...(D.decisionOf(n) ? [R(`　處理：${D.decisionOf(n)}`, { color: INK2, size: 17, highlight: 'yellow' })] : []),
       ...(n.replies || []).flatMap(r => [R(`↳ ${r.by || '你'}：${r.text}`, { color: INK2, size: 17, break: 1 })])], { spacing: { before: 60 } });
+    // reference images: a row of small pictures under the note text
+    const refLine = n => { const imgs = (n.refs || []).map(r => refImgs[r.id]).filter(Boolean);
+      return imgs.length ? [P([R('參考圖', { color: MUTED, size: 16 })], { spacing: { before: 100, after: 40 } }),
+        P(imgs.flatMap((im, i) => { const h = 72, w = Math.min(160, Math.round(h * im.w / im.h));
+          return [...(i ? [R('  ')] : []), new ImageRun({ data: bytes(im.url), transformation: { width: w, height: Math.round(w * im.h / im.w) } })]; }))] : []; };
     let sec = 0;
     const heading = t => P([R(pad2(++sec) + '　', { color: ACCENT, bold: true, size: 22 }), R(t, { bold: true, size: 28, color: INK })],
       { spacing: { before: 420, after: 160 }, border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: LINE, space: 4 } } });
@@ -2256,7 +2412,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       children.push(heading('整體意見'));
       children.push(table([8, 76, 16], D.general.map(n => new TableRow({ cantSplit: true, children: [
         cell([P([R('#' + (notes.indexOf(n) + 1), { bold: true, color: MUTED })])], 8),
-        cell([P(lines(n.text, { size: 21, color: INK })), subLine(n)], 76),
+        cell([P(lines(n.text, { size: 21, color: INK })), ...refLine(n), subLine(n)], 76),
         cell([P([statusRun(n)], { alignment: AlignmentType.RIGHT })], 16),
       ] })), gridBorders));
     }
@@ -2270,7 +2426,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
           cell([P([R(String(notes.indexOf(n) + 1), { bold: true, color: MUTED })])], 6, i % 2 ? shade('FCFBFF') : {}),
           cell([P(sh ? [new ImageRun({ data: bytes(sh.url), transformation: { width: w, height: Math.round(w * sh.h / sh.w) } })] : [R('（無截圖）', { color: MUTED, size: 17 })])], 38, i % 2 ? shade('FCFBFF') : {}),
           cell([P([R(tcRange(n), { bold: true, font: mono, size: 21, color: INK })], { spacing: { after: 80 } }),
-            P(lines(n.text, { size: 21, color: INK })), subLine(n)], 40, i % 2 ? shade('FCFBFF') : {}),
+            P(lines(n.text, { size: 21, color: INK })), ...refLine(n), subLine(n)], 40, i % 2 ? shade('FCFBFF') : {}),
           cell([P([statusRun(n)])], 16, i % 2 ? shade('FCFBFF') : {}),
         ] }));
       });

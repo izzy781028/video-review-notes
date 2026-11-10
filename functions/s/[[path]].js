@@ -5,6 +5,7 @@ import { getConfig } from '../../lib/db.js';
 import { videoInFolder, streamVideo, listVideos } from '../../lib/google.js';
 import { transcribe, polish } from '../../lib/ai.js';
 import { resolveShare, who } from '../../lib/share.js';
+import { saveImage, imageResponse, deleteImage, inShareFamily, spendImage } from '../../lib/images.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply,
   rememberNames, followLatest, earlierNotes, submitNotes } from '../../lib/core.js';
 
@@ -52,6 +53,13 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
     return json({ reply });
   }
   if ((m = path.match(/^\/replies\/([\w-]+)$/)) && method === 'DELETE') { await deleteReply(d, share.video, m[1], me); return json({ ok: true }); }
+
+  // reference images: upload to this share's video; view images on it and its earlier versions; delete only your own
+  if (path === '/images' && method === 'POST') { await spendImage(d, share); return json(await saveImage(d, share.video, me.author, request)); }
+  if ((m = path.match(/^\/images\/([\w-]+)$/))) {
+    if (method === 'GET') return withCookies(await imageResponse(d, m[1], row => inShareFamily(d, share, row.video)));
+    if (method === 'DELETE') { await deleteImage(d, m[1], me); return json({ ok: true }); }
+  }
 
   if (path === '/submit' && method === 'POST') {
     const { total, sent } = await submitNotes(d, share.video, me.author);
