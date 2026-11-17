@@ -302,7 +302,8 @@
     background: rgba(20,18,40,.6); color: #fff; font: 600 13px/1.3 -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif;
     font-variant-numeric: tabular-nums; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
   #stageHit { position: absolute; inset: 0 0 52px 0; display: none; cursor: crosshair; }
-  body.editing.timed #stageHit { display: block; touch-action: none; }
+  body.editing.timed #stageHit { display: block; touch-action: pan-y; }
+  body.editing.timed.drawing #stageHit { touch-action: none; } /* arrow / box / pen drag on the picture */
   /* drawings on the frame, safe-zone guides, side-by-side compare with the previous version */
   #draw, #safe { position: absolute; pointer-events: none; overflow: visible; }
   #safe { z-index: 2; } #draw { z-index: 3; }
@@ -393,6 +394,11 @@
     body.portrait.editing video { height: 36vh; }
     body.editing .ctlRow, body.editing .kbdhint, body.editing #btnChange, body.editing #btnShare, body.editing #srcName { display: none !important; }
     #editor img { display: none; } /* the frame is right above; keep the text box and Save on screen */
+    /* typing: the video has scrolled away, so a small copy of the frame stays next to the timecode */
+    body.typing #editor .row { flex-direction: row; align-items: flex-start; gap: 10px; }
+    body.typing #editor img[src^="data:"] { display: block; width: 84px; flex: none; border-radius: 10px; }
+    body.typing #toolsRow { display: none; }
+    body.typing #editor textarea { min-height: 120px; }
     #list { max-height: none; overflow: visible; }
     #editor .row { flex-direction: column; }
     #editor img { width: 50%; }
@@ -648,7 +654,6 @@
     </select>
     <label style="font-weight:400"><input type="checkbox" id="setAutoPolish" style="width:auto"> 語音辨識完自動潤飾</label>
     <label style="font-weight:400"><input type="checkbox" id="setPolishImage" style="width:auto"> 潤飾時附上該時間點截圖，讓 AI 看畫面寫得更具體</label>
-    <label style="font-weight:400"><input type="checkbox" id="setAutoResume" style="width:auto"> 存完意見後影片自動繼續播放（這台裝置）</label>
     <div class="bar serverOnly ownerOnly"><button type="button" id="btnHealth"><i data-ic="checkCircle"></i>系統狀態</button>
       <span class="small muted">檢查 Drive、語音、AI、中繼、刪除小幫手、本機 Claude 是否都接好</span></div>
     <div class="localOnly">
@@ -800,7 +805,7 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
   const settings = Object.assign({ reviewer: '', engine: 'elevenlabs', elKey: '', oaKey: '', terms: '',
-    anKey: '', polishModel: 'claude-opus-5-5', autoPolish: true, polishImage: true, driveFolder: '', gKey: '', autoResume: true },
+    anKey: '', polishModel: 'claude-opus-5-5', autoPolish: true, polishImage: true, driveFolder: '', gKey: '' },
     store.get('vrn.settings', {}));
 
   let videoName = '', videoKey = '', notes = [], editing = null, activeId = null;
@@ -1405,8 +1410,8 @@
     if (!editing || $('#edGeneral').checked) return;
     const [x, y] = normAt(e);
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    if (drawTool === 'pt') { tapAt = { x, y, cx: e.clientX, cy: e.clientY, id: e.pointerId }; return; } // set on release, unless it became a scroll
     e.preventDefault();
-    if (drawTool === 'pt') { editing.pt = { x: clamp01(x), y: clamp01(y) }; marksChanged(); return; }
     $('#stageHit').setPointerCapture(e.pointerId);
     drag = { type: drawTool, pts: [[clamp01(x), clamp01(y)]] };
     if (drawTool !== 'pen') drag.pts.push(drag.pts[0].slice());
@@ -1425,12 +1430,20 @@
     if (sh.type === 'pen' ? sh.pts.length > 2 : Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.02) (editing.shapes ||= []).push(sh);
     marksChanged();
   };
-  $('#stageHit').addEventListener('pointerup', endDrag);
-  $('#stageHit').addEventListener('pointercancel', endDrag);
+  let tapAt = null;
+  $('#stageHit').addEventListener('pointerup', e => {
+    const t = tapAt; tapAt = null;
+    if (t && editing && t.id === e.pointerId && Math.hypot(e.clientX - t.cx, e.clientY - t.cy) < 12) {
+      editing.pt = { x: clamp01(t.x), y: clamp01(t.y) }; marksChanged();
+    }
+    endDrag();
+  });
+  $('#stageHit').addEventListener('pointercancel', () => { tapAt = null; endDrag(); });
   $('#drawTools').onclick = e => {
     const b = e.target.closest('[data-tool]');
     if (!b) return;
     drawTool = b.dataset.tool;
+    document.body.classList.toggle('drawing', drawTool !== 'pt');
     $('#drawTools').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
   };
   $('#btnUndoDraw').onclick = () => {
@@ -1485,12 +1498,30 @@
     const hdr = Math.round(document.querySelector('header').getBoundingClientRect().bottom) + 8;
     document.documentElement.style.setProperty('--hdr', hdr + 'px');
     const spacer = $('#stageSpacer'), stuck = document.body.classList.contains('stuck');
-    const want = narrow.matches && !$('#playerWrap').hidden && !!video.src && spacer.getBoundingClientRect().top < hdr;
+    const want = narrow.matches && !$('#playerWrap').hidden && !!video.src && !document.body.classList.contains('typing')
+      && spacer.getBoundingClientRect().top < hdr;
     if (want && !stuck) spacer.style.height = $('#stage').offsetHeight + 'px';
     if (!want) spacer.style.height = '0px';
     if (want !== stuck) { document.body.classList.toggle('stuck', want); refreshPt(); }
   }
   const schedulePin = () => { if (!pinFrame) pinFrame = requestAnimationFrame(updatePin); };
+  // On a phone the keyboard takes half the screen; with the video pinned on top there was no room left to see
+  // or scroll the text box. While typing in the editor the video scrolls away and a small frame sits beside the text.
+  const typingField = el => el?.closest?.('#editor') && /^(TEXTAREA|INPUT)$/.test(el.tagName) && !/^(checkbox|file)$/.test(el.type);
+  let typingOff = 0;
+  document.addEventListener('focusin', e => {
+    if (!narrow.matches || !typingField(e.target)) return;
+    clearTimeout(typingOff);
+    if (document.body.classList.contains('typing')) return;
+    document.body.classList.add('typing'); updatePin();
+    // once the keyboard is up, bring the text box to the middle of what is still visible (no animation: it can cut off the input method)
+    setTimeout(() => { if (document.activeElement === e.target) e.target.scrollIntoView({ block: 'center' }); }, 350);
+  });
+  document.addEventListener('focusout', e => {
+    if (!typingField(e.target)) return;
+    // moving between the text box and the editor's buttons is not leaving it
+    typingOff = setTimeout(() => { if (!typingField(document.activeElement)) { document.body.classList.remove('typing'); updatePin(); } }, 250);
+  });
   window.addEventListener('scroll', schedulePin, { passive: true });
   window.addEventListener('resize', schedulePin);
   narrow.addEventListener?.('change', schedulePin);
@@ -1562,7 +1593,7 @@
     refEdit = { added: new Set(), removed: new Set() }; renderEdRefs();
     $('#editor').classList.add('open');
     document.body.classList.add('editing');
-    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => { $('#stageSpacer').scrollIntoView({ behavior: 'smooth', block: 'start' }); refreshPt(); }, 50);
+    if (matchMedia('(max-width: 700px)').matches) setTimeout(() => { if (!typingField(document.activeElement)) $('#stageSpacer').scrollIntoView({ behavior: 'smooth', block: 'start' }); refreshPt(); }, 50);
     else setTimeout(() => { $('#editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); refreshPt(); }, 50);
   }
   function syncGeneral() {
@@ -1610,9 +1641,7 @@
     notes.sort(byTime);
     if (!editing.refs?.length) delete editing.refs;
     refEdit.removed.forEach(dropImage); refEdit = { added: new Set(), removed: new Set() };
-    const resume = settings.autoResume !== false && !editing.general && !video.ended && video.src;
     persist(editing); closeEditor(); render();
-    if (resume) video.play().catch(() => {});
   }
   $('#btnAddText').onclick = () => { openEditor(); $('#edText').focus(); };
   $('#btnAddGeneral').onclick = () => { openEditor(null, true); $('#edText').focus(); };
@@ -2112,6 +2141,7 @@
   const isTyping = e => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   document.addEventListener('keyup', e => { if (e.key === ' ' && video.src && !isTyping(e) && !$('#settings').open) e.preventDefault(); }, true);
   document.addEventListener('keydown', e => {
+    if (e.isComposing || e.keyCode === 229) return; // the input method is still composing (注音、拼音…)
     const typing = isTyping(e);
     // while recording, Space ends the recording (like a voice memo) and never starts the video
     if (rec.active && e.key === ' ' && (!typing || e.target.id === 'edText')) {
@@ -2534,7 +2564,6 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     $('#setDriveFolder').value = settings.driveFolder; $('#setGKey').value = settings.gKey;
     $('#setAnKey').value = settings.anKey; $('#setPolishModel').value = settings.polishModel;
     $('#setAutoPolish').checked = settings.autoPolish; $('#setPolishImage').checked = settings.polishImage;
-    $('#setAutoResume').checked = settings.autoResume !== false;
     $('#settings').showModal();
   }
   $('#btnSettings').onclick = openSettings;
@@ -2576,7 +2605,6 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       elKey: $('#setElKey').value.trim(), oaKey: $('#setOaKey').value.trim(), terms: $('#setTerms').value,
       anKey: $('#setAnKey').value.trim(),
       polishModel: $('#setPolishModel').value, autoPolish: $('#setAutoPolish').checked, polishImage: $('#setPolishImage').checked,
-      autoResume: $('#setAutoResume').checked,
       driveFolder: $('#setDriveFolder').value.trim(), gKey: $('#setGKey').value.trim() });
     store.set('vrn.settings', settings);
     if (api.mode === 'owner')
