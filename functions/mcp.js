@@ -61,7 +61,7 @@ function timecode(n, fps = '29.97', start = '00:00:00:00') {
 }
 const isClient = n => String(n.origAuthor || n.author || 'owner').startsWith('share:');
 function noteText(n, fps, start, showNew) {
-  const who = isClient(n) ? `客戶：${n.by || '外部審片'}${!n.submitted && !n.carried ? '（還沒按送出，可能還在看）' : ''}` : '你';
+  const who = isClient(n) ? `客戶：${n.by || '外部審片'}${n.group && n.group !== n.by ? `（${n.group}）` : ''}${!n.submitted && !n.carried ? '（還沒按送出，可能還在看）' : ''}` : '你';
   const marks = [n.pt ? `畫面位置 x${Math.round(n.pt.x * 100)}% y${Math.round(n.pt.y * 100)}%` : '',
     n.shapes?.length ? '畫面上有' + [...new Set(n.shapes.map(s => SHAPES[s.type] || '標記'))].join('、') : ''].filter(Boolean).join('，');
   const lines = [`- ${showNew && n.new ? '🆕 ' : ''}[${timecode(n, fps, start)}] ${who}${marks ? `（${marks}）` : ''}  id=${n.id}`,

@@ -585,6 +585,7 @@
     </button>
     <div id="statusBar" class="bar serverOnly" hidden>
       <span>審核狀態：<strong id="statusText"></strong></span><span id="dueNote" class="chip" hidden></span>
+      <button id="btnMe" class="guestOnly ghost small" title="換成別人的名字（同一台裝置給同事用時）"></button>
       <span class="spacer" style="flex:1"></span>
       <span class="seg">
       <button id="btnSubmit" class="guestOnly"><i data-ic="share"></i>送出修改意見</button>
@@ -673,7 +674,7 @@
   <h3 style="margin-top:0" class="iconLabel"><i data-ic="link"></i>分享給外部審片</h3>
   <div class="small muted" id="shareVideo"></div>
   <form id="shareForm">
-    <label>對方的名字（會顯示在他的意見上）</label>
+    <label>對方（公司或窗口的名字；同事一起看時，每個人打開會再填自己的名字）</label>
     <input id="shLabel" type="text" placeholder="例如：王小姐（客戶）" required>
     <div class="bar">
       <label style="flex:1; margin:0">連結有效
@@ -701,6 +702,15 @@
   <div class="bar"><span class="spacer" style="flex:1"></span><button id="shClose">關閉</button></div>
 </dialog>
 
+<dialog id="nameDlg">
+  <form id="nameForm">
+    <h3 style="margin-top:0">你的名字</h3>
+    <p class="small muted" style="margin:0 0 8px">這個連結可能有好幾位同事一起看。填上名字，你留的意見會顯示是你寫的，也只有你能修改。</p>
+    <div id="nameChips" class="bar" style="margin:0 0 6px"></div>
+    <input id="nameInput" type="text" maxlength="30" placeholder="例如：陳小姐、行銷部 Amy" autocomplete="name" required>
+    <div class="bar"><span class="spacer" style="flex:1"></span><button class="primary">開始看片</button></div>
+  </form>
+</dialog>
 <dialog id="healthDlg">
   <h3 style="margin-top:0" class="iconLabel"><i data-ic="checkCircle"></i>系統狀態</h3>
   <div id="healthBody" class="small">檢查中…</div>
@@ -812,11 +822,18 @@
   let refEdit = { added: new Set(), removed: new Set() }; // reference images uploaded / removed while the editor is open
 
   // ---------- backend: 'local' (keys in this browser), 'owner' (signed in via Cloudflare) or 'guest' (share link) ----------
+  // guests: who is using this device, for links shared with several colleagues
+  const guestMe = { rid: '', name: '', people: {} };
+  const meKey = () => 'vrn.me.' + api.token.slice(0, 16);
+  const mine = n => api.mode !== 'guest' || !n.rid || n.rid === guestMe.rid;
   const api = {
     mode: 'local', token: '', pin: '', limit: 50,
     async req(path, opts = {}) {
       const headers = { ...(opts.headers || {}) };
-      if (this.mode === 'guest') { headers['x-share-token'] = this.token; if (this.pin) headers['x-share-pin'] = this.pin; }
+      if (this.mode === 'guest') {
+        headers['x-share-token'] = this.token; if (this.pin) headers['x-share-pin'] = this.pin;
+        if (guestMe.rid) { headers['x-reviewer-id'] = guestMe.rid; headers['x-reviewer-name'] = encodeURIComponent(guestMe.name); }
+      }
       if (opts.json !== undefined) { headers['content-type'] = 'application/json'; opts = { ...opts, body: JSON.stringify(opts.json) }; }
       const r = await fetch((this.mode === 'guest' ? '/s/api' : '/api') + path, { ...opts, headers, credentials: 'same-origin' });
       const j = await r.json().catch(() => ({}));
@@ -1575,7 +1592,8 @@
     editing = note ? { ...note, pt: note.pt && { ...note.pt }, shapes: note.shapes?.map(sh => ({ ...sh, pts: sh.pts.map(p => p.slice()) })),
         refs: note.refs?.map(r => ({ ...r })) }
       : { id: crypto.randomUUID?.() || String(Date.now()), t: video.currentTime, frame: frameOf(video.currentTime),
-        text: '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true };
+        text: '', done: false, thumb: grabThumb(), by: settings.reviewer, created: new Date().toISOString(), isNew: true,
+        ...(api.mode === 'guest' ? { rid: guestMe.rid } : {}) };
     if (ranged) { // I / O marks: the note covers that range; its picture is the first frame
       const fps = fpsInfo()[0];
       Object.assign(editing, { frame: marks.in, t: (marks.in + 0.5) / fps, thumb: '' });
@@ -1970,8 +1988,8 @@
     $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}${shown.length !== notes.length ? `・顯示 ${shown.length}` : ''}` : '';
     $('#railCount').textContent = notes.length; $('#railCount').hidden = !notes.length;
     if (api.mode === 'guest') {
-      const unsent = notes.filter(n => !n.submitted).length, b = $('#btnSubmit');
-      b.innerHTML = ic('share') + (unsent ? `送出 ${unsent} 則修改意見` : notes.length ? '已全部送出' : '送出修改意見');
+      const own = notes.filter(mine), unsent = own.filter(n => !n.submitted).length, b = $('#btnSubmit');
+      b.innerHTML = ic('share') + (unsent ? `送出 ${unsent} 則修改意見` : own.length ? '已全部送出' : '送出修改意見');
       b.disabled = !unsent;
       b.classList.toggle('primary', !!unsent);
       b.title = unsent ? '看完了就按這裡，我們會收到通知' : notes.length ? '新增或修改意見後，可以再送出一次' : '先留下要修改的地方，再按送出';
@@ -1984,11 +2002,11 @@
             <button class="tcbtn" data-act="seek">${label(n)}</button>
             <span class="chip">#${notes.indexOf(n) + 1}</span>
             ${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}
-            <span class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}</span>
+            <span class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}${api.mode === 'owner' && n.group && n.group !== n.by ? `<span class="muted">・${esc(n.group)}</span>` : ''}</span>
             ${server() && isClient(n) && !n.submitted && !n.carried ? `<span class="chip unsent" title="${api.mode === 'guest' ? '按上方「送出修改意見」後我們才會收到通知' : '客戶還沒按「送出」，可能還在看'}">未送出</span>` : ''}
           </div>
           ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 ${esc(vlabel(n.carried))} 帶入・時間碼可能已隨剪接變動</div>` : ''}
-          <div class="text" contenteditable="plaintext-only" data-act="text">${esc(n.text)}</div>
+          <div class="text"${mine(n) ? ' contenteditable="plaintext-only"' : ''} data-act="text">${esc(n.text)}</div>
           ${n.refs?.length ? `<div class="refs">${refsHtml(n.refs)}</div>` : ''}
           ${n.decision && api.mode !== 'guest' ? `<div class="small decision"><span class="chip ${{ reject: 'fresh', adjust: 'st-changes', accept: 'st-approved' }[n.decision]}">${{ reject: '不改', adjust: '改法調整', accept: '照改' }[n.decision]}</span>${n.decisionNote ? ' ' + esc(n.decisionNote) : ''}</div>` : ''}
           ${n.raw ? `<details class="small muted"><summary>原始口述</summary>${esc(n.raw)}</details>` : ''}
@@ -1996,8 +2014,8 @@
           <div class="actions">
             ${api.mode === 'guest' ? '' : `<button data-act="done">${n.done ? ic('undo') + '未完成' : ic('check') + '已修改'}</button>`}
             <button data-act="reply">${ic('reply')}回覆${n.replies?.length ? ' ' + n.replies.length : ''}</button>
-            <button data-act="edit">編輯</button>
-            <button data-act="del">刪除</button>
+            ${mine(n) ? `<button data-act="edit">編輯</button>
+            <button data-act="del">刪除</button>` : ''}
           </div>
         </div>
       </div>`).join('') : `<div class="muted small">${!notes.length ? '還沒有意見。播放影片，在要改的地方按「語音意見」或「文字意見」。'
@@ -2062,6 +2080,7 @@
     if (act === 'ref') { openRefs(n.refs, +btn.dataset.i); return; }
     if (act === 'seek') { video.pause(); activeId = n.id; if (!n.general) seekFrame(n.frame); render(); refreshPt(); }
     if (act === 'done') { n.done = !n.done; persist(n); render(); }
+    if ((act === 'edit' || act === 'del') && !mine(n)) return;
     if (act === 'edit') { if (!n.general) seekFrame(n.frame); openEditor(n); $('#edText').focus(); }
     if (act === 'del' && confirm(`刪除「${label(n)}」這則意見？`)) { notes.splice(notes.indexOf(n), 1); unpersist(n); render(); }
   });
@@ -2645,7 +2664,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
 
   // 送出: the client is done; the owner gets one notification with the count
   $('#btnSubmit').onclick = async () => {
-    const unsent = notes.filter(n => !n.submitted).length;
+    const unsent = notes.filter(n => mine(n) && !n.submitted).length;
     if (queue.get().length) { toast(`還有 ${queue.get().length} 則意見在等網路上傳，連上網路後再送出。`); flushQueue(); return; }
     if (!unsent || !confirm(`送出 ${unsent} 則修改意見？送出後我們會收到通知，之後還可以再補充。`)) return;
     $('#btnSubmit').disabled = true;
@@ -2672,7 +2691,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   // ---------- share links for outside reviewers (owner) ----------
   const shareUrl = token => `${location.origin}/s/#t=${token}`;
   const shareMessage = (label, token, expires, hasPin, due) =>
-    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」：\n${shareUrl(token)}\n${due ? `麻煩在 ${dueText(due)}前回覆，謝謝！\n` : ''}（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
+    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」。同事也可以用同一個連結，打開時填自己的名字就好：\n${shareUrl(token)}\n${due ? `麻煩在 ${dueText(due)}前回覆，謝謝！\n` : ''}（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
   // a short update for LINE: which version is up, and how many of their points from last time were fixed
   function notifyMessage(sh) {
     const p = sh.progress, url = shareUrl(sh.token), name = sh.label.replace(/（.*?）|\(.*?\)/g, '').trim();
@@ -3077,6 +3096,37 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       $('#pinForm').onsubmit = e => { e.preventDefault(); api.pin = $('#pinInput').value.trim(); startGuest(); };
     }
   }
+  let shareLabel = '';
+  function showMe() {
+    $('#who').textContent = `${guestMe.name}・審片`;
+    $('#btnMe').textContent = `我是 ${guestMe.name}・換人`;
+  }
+  // the names already used on this link, so a colleague on another device can pick theirs in one tap
+  function askName(list = notes) {
+    const names = [...new Set([shareLabel, ...list.map(n => n.by)].filter(Boolean))].slice(0, 8);
+    $('#nameChips').innerHTML = names.map(x => `<button type="button" class="small" data-name="${esc(x)}">${esc(x)}</button>`).join('');
+    $('#nameChips').hidden = !names.length;
+    $('#nameInput').value = guestMe.name || '';
+    $('#nameDlg').showModal();
+    return new Promise(res => {
+      $('#nameChips').onclick = e => { const b = e.target.closest('[data-name]'); if (b) { $('#nameInput').value = b.dataset.name; $('#nameInput').focus(); } };
+      $('#nameForm').onsubmit = e => {
+        e.preventDefault();
+        const name = $('#nameInput').value.trim().slice(0, 30);
+        if (!name) return;
+        const changed = guestMe.name && guestMe.name !== name;
+        // a different person on the same device is a different reviewer; switching back gets your own notes back
+        guestMe.people = { ...(guestMe.people || {}), ...(guestMe.name ? { [guestMe.name]: guestMe.rid } : {}) };
+        if (changed) guestMe.rid = guestMe.people[name] || (crypto.randomUUID?.() || Date.now().toString(36)).replace(/[^\w-]/g, '').slice(0, 32);
+        guestMe.name = name; guestMe.people[name] = guestMe.rid;
+        store.set(meKey(), guestMe); settings.reviewer = name;
+        $('#nameDlg').close(); showMe(); if (changed) render();
+        res();
+      };
+    });
+  }
+  $('#nameDlg').addEventListener('cancel', e => { if (!guestMe.name) e.preventDefault(); }); // a name is needed the first time
+  $('#btnMe').onclick = () => askName();
   async function startGuest() {
     api.mode = 'guest';
     document.body.classList.add('server', 'guest');
@@ -3086,9 +3136,13 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     try { info = await api.req('/info'); }
     catch (err) { return showGate(err.message, err.data?.code === 'pin'); }
     $('#gate').hidden = true; document.querySelector('main').hidden = false;
-    Object.assign(settings, { reviewer: info.name, autoPolish: info.config.autoPolish, engine: 'elevenlabs' });
+    Object.assign(guestMe, store.get(meKey(), {}));
+    if (!guestMe.rid) guestMe.rid = (crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36)).replace(/[^\w-]/g, '').slice(0, 32);
+    shareLabel = info.name;
+    if (!guestMe.name) await askName(info.notes);
+    Object.assign(settings, { reviewer: guestMe.name, autoPolish: info.config.autoPolish, engine: 'elevenlabs' });
     api.limit = info.limit;
-    $('#who').textContent = `${info.name}・審片`;
+    showMe();
     video.src = probeSrc = api.media(info.video.id);
     openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: withPending(info.notes, info.video.id) });
     renderPrevious(info.previous);

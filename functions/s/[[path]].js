@@ -4,7 +4,7 @@ import { HttpError, json, handle, body } from '../../lib/http.js';
 import { getConfig } from '../../lib/db.js';
 import { videoInFolder, streamVideo, listVideos } from '../../lib/google.js';
 import { transcribe, polish } from '../../lib/ai.js';
-import { resolveShare, who } from '../../lib/share.js';
+import { resolveShare, who, whoLabel } from '../../lib/share.js';
 import { saveImage, imageResponse, deleteImage, inShareFamily, spendImage } from '../../lib/images.js';
 import { dueOf } from '../../lib/ops.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply,
@@ -18,7 +18,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
   const method = request.method;
   const opening = path === '/info';
   const { share, d, setCookies } = await resolveShare(request, env, url, { opening });
-  const me = who(share);
+  const me = who(share, request);
   const withCookies = res => { setCookies.forEach(c => res.headers.append('set-cookie', c)); return res; };
   let m;
 
@@ -50,7 +50,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
   }
   if ((m = path.match(/^\/notes\/([\w-]+)\/replies$/)) && method === 'POST') {
     const reply = await addReply(d, share.video, m[1], (await body(request)).text, me);
-    waitUntil(notify(d, env, 'reply', `${share.label} 在「${share.video_name}」回覆：${reply.text.slice(0, 60)}`, share.id));
+    waitUntil(notify(d, env, 'reply', `${whoLabel(me)} 在「${share.video_name}」回覆：${reply.text.slice(0, 60)}`, share.id));
     return json({ reply });
   }
   if ((m = path.match(/^\/replies\/([\w-]+)$/)) && method === 'DELETE') { await deleteReply(d, share.video, m[1], me); return json({ ok: true }); }
@@ -63,19 +63,19 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
   }
 
   if (path === '/submit' && method === 'POST') {
-    const { total, sent } = await submitNotes(d, share.video, me.author);
+    const { total, sent } = await submitNotes(d, share.video, me.author, me.rid);
     if (!total) throw new HttpError(400, '還沒有任何意見。沒有要修改的話，請按「核准」。');
     if (!sent) throw new HttpError(400, '意見都已經送出了。');
-    const info = await patchVideo(d, share.video, { status: 'changes', statusBy: share.label, statusAt: Date.now() });
-    waitUntil(notify(d, env, 'submit', `${share.label} 送出 ${sent} 則修改意見：「${share.video_name}」`, share.id));
+    const info = await patchVideo(d, share.video, { status: 'changes', statusBy: whoLabel(me), statusAt: Date.now() });
+    waitUntil(notify(d, env, 'submit', `${whoLabel(me)} 送出 ${sent} 則修改意見：「${share.video_name}」`, share.id));
     return json({ info, sent, notes: forGuest(await listNotes(d, share.video, me.author)) });
   }
 
   if (path === '/status' && method === 'POST') {
     const { status } = await body(request);
     if (!(status in STATUSES) || status === 'review') throw new HttpError(400, '狀態錯誤');
-    const info = await patchVideo(d, share.video, { status, statusBy: share.label, statusAt: Date.now() });
-    waitUntil(notify(d, env, 'status', `${share.label} 把「${share.video_name}」標為「${STATUSES[status]}」`, share.id));
+    const info = await patchVideo(d, share.video, { status, statusBy: whoLabel(me), statusAt: Date.now() });
+    waitUntil(notify(d, env, 'status', `${whoLabel(me)} 把「${share.video_name}」標為「${STATUSES[status]}」`, share.id));
     return json({ info });
   }
 

@@ -141,7 +141,8 @@ def print_note(n, fps, start, show_new=False):
     pt = f"（畫面位置 x{n['pt']['x']:.0%} y{n['pt']['y']:.0%}）" if n.get('pt') else ''
     if n.get('shapes'):
         pt += '（畫面上有' + '、'.join(dict.fromkeys(SHAPES.get(s.get('type'), '標記') for s in n['shapes'])) + '，用 shot 看截圖）'
-    who = f"客戶：{n.get('by') or '外部審片'}" if is_client(n) else '你'
+    group = f"（{n['group']}）" if n.get('group') and n.get('group') != n.get('by') else ''
+    who = f"客戶：{n.get('by') or '外部審片'}{group}" if is_client(n) else '你'
     if is_client(n) and not n.get('submitted') and not n.get('carried'):
         who += '（客戶還沒按送出，可能還在看）'
     cat = f"[{n['cat']}] " if n.get('cat') else ''  # older notes may still have a category
