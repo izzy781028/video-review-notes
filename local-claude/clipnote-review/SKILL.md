@@ -19,6 +19,8 @@ python3 ~/.claude/skills/clipnote-review/clipnote.py <指令>
 
 以下用 `clipnote` 代表上面這串。
 
+**有片語連接器時優先用它。** 如果工具清單裡有 `mcp__clipnote__*`（list_videos、get_inbox、get_notes、get_note_images、set_done、record_decision、reply_to_note…），讀意見、看截圖和參考圖、標已修改、記決定都直接用這些工具，不用跑 clipnote.py；get_note_images 會直接給你圖片。clipnote.py 仍然用在連接器做不到的事：上傳審片檔（upload、wait）和備份（backup）。沒有連接器時，照下面的指令做。
+
 ## 開始前先檢查
 
 每次用這個 skill，先跑：

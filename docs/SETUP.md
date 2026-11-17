@@ -242,6 +242,12 @@ Cloudflare 會用離使用者最近的機房執行片語，台灣連線常常被
 6. 填入片語網址、Client ID、Client Secret、`片語審片` 在電腦上的路徑，存檔。
 7. 測試：`python3 ~/.claude/skills/clipnote-review/clipnote.py check`，看到「片語連線 ✓」「雲端資料夾 ✓」就完成。
 8. 要轉 720p 審片檔需要 ffmpeg：macOS 執行 `brew install ffmpeg`。
+9. **接上片語連接器（建議）**：讓 Claude Code 直接有「讀意見、看截圖和參考圖、標已修改」的工具，不用靠 Claude 自己跑指令。在 repo 資料夾執行：
+   ```bash
+   bash local-claude/connect-mcp.sh
+   ```
+   （Windows：`powershell -ExecutionPolicy Bypass -File local-claude\connect-mcp.ps1`）
+   它會讀第 6 步的 config.env，用同一組服務權杖加入名為 `clipnote` 的連接器，不會把密碼印出來。看到 `clipnote: … ✓ Connected` 就好了；之後重開 Claude Code，輸入 `/mcp` 也看得到。換了服務權杖，改完 config.env 再跑一次這個指令。
 
 ---
 
