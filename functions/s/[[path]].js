@@ -6,6 +6,7 @@ import { videoInFolder, streamVideo, listVideos } from '../../lib/google.js';
 import { transcribe, polish } from '../../lib/ai.js';
 import { resolveShare, who } from '../../lib/share.js';
 import { saveImage, imageResponse, deleteImage, inShareFamily, spendImage } from '../../lib/images.js';
+import { dueOf } from '../../lib/ops.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply,
   rememberNames, followLatest, earlierNotes, submitNotes } from '../../lib/core.js';
 
@@ -32,7 +33,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
       .bind(share.id, Date.now(), (request.headers.get('user-agent') || '').slice(0, 300),
         [request.cf?.city, request.cf?.country].filter(Boolean).join(', ')).run();
     return withCookies(json({
-      role: 'guest', name: share.label, expires: share.expires,
+      role: 'guest', name: share.label, expires: share.expires, due: await dueOf(d, share.id),
       video: { id: share.video, name: meta.name }, info: await getVideo(d, share.video),
       config: { autoPolish: config.autoPolish, polishImage: config.polishImage },
       limit: dailyLimit(env), used: await usedToday(d, share.id),

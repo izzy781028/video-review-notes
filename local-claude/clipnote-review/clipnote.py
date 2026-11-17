@@ -287,6 +287,24 @@ def cmd_refs(conf, a):
         print(f'參考圖 {i}：{f}')
 
 
+def cmd_backup(conf, a):
+    out = Path(a.output or conf.get('CLIPNOTE_BACKUP_DIR') or Path.home() / 'Documents' / '片語備份').expanduser()
+    (out / 'images').mkdir(parents=True, exist_ok=True)
+    data = api(conf, '/export')
+    stamp = time.strftime('%Y%m%d-%H%M')
+    (out / f'notes-{stamp}.json').write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding='utf-8')
+    new = 0
+    for img in data.get('images', []):
+        f = out / 'images' / f"{img['id']}.jpg"
+        if f.exists() and f.stat().st_size == img.get('bytes'):
+            continue  # already backed up; images never change
+        f.write_bytes(api(conf, f"/images/{urllib.parse.quote(img['id'])}", raw_bytes=True))
+        new += 1
+    notes = sum(len(v['notes']) for v in data.get('videos', []))
+    print(f"備份完成：{len(data.get('videos', []))} 支影片、{notes} 則意見、{len(data.get('images', []))} 張參考圖（這次新下載 {new} 張）")
+    print(f'存在 {out}')
+
+
 def probe(path):
     if not shutil.which('ffprobe'):
         return None
@@ -358,6 +376,7 @@ def main():
     s = sub.add_parser('decide', help='記下使用者對客戶意見的決定'); s.add_argument('video'); s.add_argument('note')
     s.add_argument('decision', choices=['accept', 'adjust', 'reject']); s.add_argument('--note', dest='note_text', help='改法或不改的理由')
     s = sub.add_parser('shot', help='存下一則意見的截圖'); s.add_argument('video'); s.add_argument('note'); s.add_argument('-o', '--output')
+    s = sub.add_parser('backup', help='備份所有意見和參考圖到電腦'); s.add_argument('-o', '--output', help='備份資料夾（預設 ~/Documents/片語備份）')
     s = sub.add_parser('refs', help='下載一則意見附的參考圖'); s.add_argument('video'); s.add_argument('note'); s.add_argument('-o', '--output', help='存放的資料夾')
     s = sub.add_parser('upload', help='把審片檔放進雲端資料夾'); s.add_argument('file'); s.add_argument('--name'); s.add_argument('--proxy', action='store_true')
     s = sub.add_parser('wait', help='等檔案同步到片語'); s.add_argument('name'); s.add_argument('--minutes', type=int, default=10)

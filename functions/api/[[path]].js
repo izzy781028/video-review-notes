@@ -5,8 +5,9 @@ import { ownerEmail } from '../../lib/auth.js';
 import { folderId, listVideos, videoInFolder, streamVideo, canTrash, trashVideo } from '../../lib/google.js';
 import { transcribe, polish, summarize } from '../../lib/ai.js';
 import { saveImage, imageResponse, deleteImage } from '../../lib/images.js';
+import { health, sawService, shareProgress, dueOf, setDue, dueAlerts, exportAll, orphans, cleanup } from '../../lib/ops.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, usedToday, addAllowance, dailyLimit,
-  addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf } from '../../lib/core.js';
+  addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf, followLatest } from '../../lib/core.js';
 
 const OWNER = { author: 'owner' };
 
@@ -16,7 +17,14 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   const method = request.method;
   const email = await ownerEmail(request, env);
   const d = await db(env);
+  if (email === 'local-claude') waitUntil(sawService(d));
   let m;
+
+  // ---------- 系統狀態, backup, cleanup ----------
+  if (path === '/health' && method === 'GET') return json(await health(env, d, await getConfig(d)));
+  if (path === '/export' && method === 'GET') return json(await exportAll(d));
+  if (path === '/cleanup' && method === 'GET') return json({ orphans: await orphans(env, d) });
+  if (path === '/cleanup' && method === 'POST') return json({ cleared: await cleanup(env, d, (await body(request)).ids) });
 
   if (path === '/me' && method === 'GET')
     return json({ role: 'owner', email, config: await getConfig(d), drive: !!folderId(env), limit: dailyLimit(env) });
@@ -155,11 +163,14 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
       const ids = [...new Set([video, ...(me ? Object.keys(names).filter(id => versionOf(names[id])?.family === me.family) : [])])];
       const { results } = await d.prepare(`SELECT s.*, (SELECT COUNT(*) FROM opens o WHERE o.share = s.id) AS opens
         FROM shares s WHERE s.video IN (${ids.map(() => '?').join(',')}) AND s.revoked = 0 ORDER BY s.created DESC`).bind(...ids).all();
-      const shares = [];
+      const shares = [], files = await listVideos(env).catch(() => null);
       for (const s of results) {
+        // move the link to the newest version now, so the message names the version the client will see
+        if (files) { const cur = await getKv(d, 'sharecur:' + s.id, null);
+          await followLatest(d, { id: s.id, origName: s.video_name, video: cur?.id || s.video, video_name: cur?.name || s.video_name }, files); }
         const last = await d.prepare('SELECT at, ua, place FROM opens WHERE share = ? ORDER BY at DESC LIMIT 5').bind(s.id).all();
         shares.push({ id: s.id, label: s.label, token: s.token, pin: s.pin, lockDevice: !!s.lock_device, created: s.created,
-          madeFor: s.video_name, follows: !!me,
+          madeFor: s.video_name, follows: !!me, due: await dueOf(d, s.id), progress: await shareProgress(d, s),
           expires: s.expires, opens: s.opens, recent: last.results, used: await usedToday(d, s.id) });
       }
       return json({ shares, limit: dailyLimit(env) });
@@ -175,8 +186,14 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
       await d.prepare(`INSERT INTO shares (id, token, video, video_name, label, pin, lock_device, created, expires)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(share.id, share.token, video, meta.name, label, share.pin, share.lock, share.created, share.expires).run();
+      if (input.due) await setDue(d, share.id, String(input.due));
       return json({ id: share.id, token: share.token, pin: share.pin, expires: share.expires });
     }
+  }
+  if ((m = path.match(/^\/shares\/([\w-]+)$/)) && method === 'PATCH') {
+    const input = await body(request);
+    if ('due' in input) await setDue(d, m[1], input.due ? String(input.due) : null);
+    return json({ ok: true, due: await dueOf(d, m[1]) });
   }
   if ((m = path.match(/^\/shares\/([\w-]+)$/)) && method === 'DELETE') {
     await d.prepare('UPDATE shares SET revoked = 1 WHERE id = ?').bind(m[1]).run();
@@ -189,6 +206,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
 
   // ---------- notifications ----------
   if (path === '/alerts' && method === 'GET') {
+    await dueAlerts(d, env).catch(err => console.error('due alerts', err));
     const { results } = await d.prepare('SELECT id, at, kind, share, text FROM alerts WHERE seen = 0 ORDER BY at DESC LIMIT 20').all();
     return json({ alerts: results });
   }

@@ -76,9 +76,9 @@
   header h1 { white-space: nowrap; flex: none; font-size: 18px; font-weight: 700; margin: 0 8px 0 0; letter-spacing: .5px; display: flex; align-items: center; gap: 8px; }
   .brand-mark { width: 32px; height: 32px; flex: none; filter: drop-shadow(0 4px 10px rgba(59,43,255,.3)); }
   header .spacer { flex: 1; }
-  button, select, input[type=text], input[type=password], input[type=url], input[type=search], textarea {
+  button, select, input[type=text], input[type=password], input[type=url], input[type=search], input[type=date], textarea {
     font: inherit; color: var(--ink); background: var(--glass-strong); border: 1px solid var(--glass-border); border-radius: 12px; }
-  input[type=text], input[type=password], input[type=url], input[type=search], textarea, select { box-shadow: var(--inset); }
+  input[type=text], input[type=password], input[type=url], input[type=search], input[type=date], textarea, select { box-shadow: var(--inset); }
   button { padding: 7px 12px; cursor: pointer; white-space: nowrap; box-shadow: var(--shadow-soft); transition: transform .12s, background .2s; }
   button:hover { background: var(--accent-soft); }
   button, .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -117,7 +117,7 @@
     box-shadow: 0 6px 16px rgba(98,80,214,.35), inset 0 1px 0 rgba(255,255,255,.45); }
   button.rec { background: var(--rec); color: #fff; border-color: var(--rec); animation: pulse 1s infinite; }
   @keyframes pulse { 50% { opacity: .65; } }
-  select, input[type=text], input[type=password], input[type=url] { padding: 7px 10px; }
+  select, input[type=text], input[type=password], input[type=url], input[type=date] { padding: 7px 10px; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 20px; padding: 16px; max-width: 1500px; margin: 0 auto; }
   @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
@@ -352,6 +352,15 @@
   .dots { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
   .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
   .dots i.on { background: var(--accent); }
+  .hRow { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .hRow:first-child { border-top: 0; }
+  .hRow .dot { grid-row: span 2; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; margin-top: 1px; }
+  .hRow.ok .dot { background: #1f9d55; } .hRow.fail .dot { background: var(--rec); } .hRow.warn .dot { background: #d68a00; } .hRow.off .dot { background: var(--muted); }
+  .hRow b { font-weight: 600; } .hRow span { color: var(--ink-2); word-break: break-word; }
+  .hRow.fail span { color: var(--rec); }
+  #cleanList label { display: flex; gap: 8px; align-items: baseline; font-weight: 400; margin: 6px 0; }
+  #cleanList input { width: auto; }
+  .shareRow .prog { margin-top: 2px; }
   .shareRow { border: 1px solid var(--glass-border); background: var(--glass-flat); border-radius: 16px; padding: 10px 12px; margin-top: 8px; color: var(--ink-2); }
   #shareMsg { width: 100%; min-height: 110px; }
   body.guest .ownerOnly, body:not(.server) .serverOnly, body.server .localOnly, body:not(.owner) .ownerSrv, body:not(.guest) .guestOnly { display: none !important; }
@@ -522,6 +531,7 @@
         <span class="hk"><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><span>倒轉／停／快轉</span></span>
         <span class="hk"><kbd>I</kbd><kbd>O</kbd><span>標出區段</span></span>
         <span class="hk"><kbd>[</kbd><kbd>]</kbd><span>上／下一則</span></span>
+        <span class="hk"><kbd>N</kbd><span>下一則未處理</span></span>
       </div>
 
       <div id="editor" class="panel">
@@ -568,7 +578,7 @@
       <i data-ic="panelOpen"></i><span id="railCount" class="chip"></span><span class="railText">修改清單</span>
     </button>
     <div id="statusBar" class="bar serverOnly" hidden>
-      <span>審核狀態：<strong id="statusText"></strong></span>
+      <span>審核狀態：<strong id="statusText"></strong></span><span id="dueNote" class="chip" hidden></span>
       <span class="spacer" style="flex:1"></span>
       <span class="seg">
       <button id="btnSubmit" class="guestOnly"><i data-ic="share"></i>送出修改意見</button>
@@ -580,7 +590,7 @@
     <div id="verBar" class="bar listBody" hidden></div>
     <details id="prevNotes" class="listBody" hidden></details>
     <div class="bar" style="margin-top:0; margin-bottom:8px">
-      <strong>修改清單</strong><span id="count" class="muted small"></span>
+      <strong>修改清單</strong><span id="count" class="muted small"></span><span id="pendingChip" class="chip fresh" hidden title="網路恢復後會自動上傳"></span>
       <span class="spacer" style="flex:1"></span>
       <button id="btnSummary" class="ghost small ownerOnly listBody" title="把未完成的意見整理成待辦清單，標出重複和矛盾"><i data-ic="sparkle"></i>AI 彙整</button>
       <button id="btnCollapse" class="ghost iconBtn" title="收起修改清單" aria-label="收起修改清單"><i data-ic="panelClose"></i></button>
@@ -638,6 +648,9 @@
     </select>
     <label style="font-weight:400"><input type="checkbox" id="setAutoPolish" style="width:auto"> 語音辨識完自動潤飾</label>
     <label style="font-weight:400"><input type="checkbox" id="setPolishImage" style="width:auto"> 潤飾時附上該時間點截圖，讓 AI 看畫面寫得更具體</label>
+    <label style="font-weight:400"><input type="checkbox" id="setAutoResume" style="width:auto"> 存完意見後影片自動繼續播放（這台裝置）</label>
+    <div class="bar serverOnly ownerOnly"><button type="button" id="btnHealth"><i data-ic="checkCircle"></i>系統狀態</button>
+      <span class="small muted">檢查 Drive、語音、AI、中繼、刪除小幫手、本機 Claude 是否都接好</span></div>
     <div class="localOnly">
       <label>Google Drive 影片資料夾網址</label>
       <input id="setDriveFolder" type="url" placeholder="https://drive.google.com/drive/folders/..." autocomplete="off">
@@ -658,8 +671,11 @@
     <label>對方的名字（會顯示在他的意見上）</label>
     <input id="shLabel" type="text" placeholder="例如：王小姐（客戶）" required>
     <div class="bar">
-      <label style="flex:1; margin:0">有效期限
+      <label style="flex:1; margin:0">連結有效
         <select id="shDays"><option value="3">3 天</option><option value="7">7 天</option><option value="14" selected>14 天</option><option value="30">30 天</option></select>
+      </label>
+      <label style="flex:1; margin:0">請對方回覆的期限（選填）
+        <input id="shDue" type="date">
       </label>
     </div>
     <label style="font-weight:400"><input type="checkbox" id="shLock" style="width:auto"> 只限第一台打開的裝置（轉傳給別人會打不開）</label>
@@ -680,6 +696,17 @@
   <div class="bar"><span class="spacer" style="flex:1"></span><button id="shClose">關閉</button></div>
 </dialog>
 
+<dialog id="healthDlg">
+  <h3 style="margin-top:0" class="iconLabel"><i data-ic="checkCircle"></i>系統狀態</h3>
+  <div id="healthBody" class="small">檢查中…</div>
+  <div id="cleanBox" hidden>
+    <h4 style="margin-bottom:4px">清理舊資料</h4>
+    <p class="small muted" style="margin:0 0 6px">這些影片已經不在審片資料夾（刪掉了，或移到 _封存），但意見和參考圖還留在資料庫。清掉之後無法復原，建議先用本機 Claude 備份（clipnote backup）。移到 _封存、之後還想查的不要勾。</p>
+    <div id="cleanList" class="small"></div>
+    <div class="bar"><span class="spacer" style="flex:1"></span><button id="cleanGo" disabled>清除勾選的</button></div>
+  </div>
+  <div class="bar"><button id="btnClean" hidden>清理舊資料…</button><span class="spacer" style="flex:1"></span><button id="healthAgain">重新檢查</button><button id="healthClose" class="primary">關閉</button></div>
+</dialog>
 <dialog id="refDlg" aria-label="參考圖">
   <img id="refBig" alt="參考圖">
   <div class="bar"><button id="refPrev" aria-label="上一張">‹</button><span id="refPos" class="small muted"></span><button id="refNext" aria-label="下一張">›</button>
@@ -773,7 +800,7 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
   };
   const settings = Object.assign({ reviewer: '', engine: 'elevenlabs', elKey: '', oaKey: '', terms: '',
-    anKey: '', polishModel: 'claude-opus-5-5', autoPolish: true, polishImage: true, driveFolder: '', gKey: '' },
+    anKey: '', polishModel: 'claude-opus-5-5', autoPolish: true, polishImage: true, driveFolder: '', gKey: '', autoResume: true },
     store.get('vrn.settings', {}));
 
   let videoName = '', videoKey = '', notes = [], editing = null, activeId = null;
@@ -802,12 +829,54 @@
     if (!project.remote) return save();
     const { isNew, author, ...data } = n;
     if (data.refs) data.refs = data.refs.filter(r => !r.pending).map(({ id, w, h }) => ({ id, w, h }));
-    api.req(`${notesPath()}/${encodeURIComponent(n.id)}`, { method: 'PUT', json: data }).catch(err => toast('意見沒有存到雲端：' + err.message));
+    send({ path: `${notesPath()}/${encodeURIComponent(n.id)}`, method: 'PUT', data, video: project.remote, id: n.id });
   }
   function unpersist(n) {
     if (!project.remote) return save();
-    api.req(`${notesPath()}/${encodeURIComponent(n.id)}`, { method: 'DELETE' }).catch(err => toast('刪除失敗：' + err.message));
+    send({ path: `${notesPath()}/${encodeURIComponent(n.id)}`, method: 'DELETE', video: project.remote, id: n.id });
   }
+  // ---------- offline queue: a save that can't reach the server waits on this device and is sent later ----------
+  const queueKey = () => 'vrn.queue.' + (api.mode === 'guest' ? 'g.' + api.token.slice(0, 16) : api.mode);
+  const queue = { get: () => store.get(queueKey(), []), set: q => store.set(queueKey(), q) };
+  const retryable = err => !err.status || err.status >= 500; // no answer at all, or the server / network in between failed
+  let flushing = false;
+  async function send(op) {
+    queue.set(queue.get().filter(o => o.path !== op.path)); // the newest change to a note replaces a waiting one
+    try { await api.req(op.path, op.data ? { method: op.method, json: op.data } : { method: op.method }); }
+    catch (err) {
+      if (!retryable(err)) { toast((op.method === 'DELETE' ? '刪除失敗：' : '意見沒有存到雲端：') + err.message); return; }
+      queue.set([...queue.get(), { ...op, at: Date.now() }]);
+      toast('網路不穩，意見先存在這台裝置，恢復連線後會自動上傳。');
+    }
+    showPending();
+  }
+  async function flushQueue() {
+    if (flushing || api.mode === 'local' || !queue.get().length) return showPending();
+    flushing = true;
+    try {
+      for (const op of queue.get()) {
+        try { await api.req(op.path, op.data ? { method: op.method, json: op.data } : { method: op.method }); }
+        catch (err) { if (retryable(err)) break; toast('有一則意見無法上傳：' + err.message); }
+        queue.set(queue.get().filter(o => o !== op && o.path !== op.path));
+        showPending();
+      }
+      if (!queue.get().length) toast('暫存的意見都上傳好了');
+    } finally { flushing = false; showPending(); }
+  }
+  // notes fetched from the server, with the changes still waiting on this device laid on top
+  function withPending(list, video) {
+    for (const op of api.mode === 'local' ? [] : queue.get().filter(o => o.video === video)) {
+      list = list.filter(n => n.id !== op.id);
+      if (op.method === 'PUT') list.push({ ...op.data, author: api.mode === 'guest' ? undefined : 'owner' });
+    }
+    return list;
+  }
+  function showPending() {
+    const n = api.mode === 'local' ? 0 : queue.get().length, chip = $('#pendingChip');
+    chip.hidden = !n; chip.textContent = `${n} 則等網路上傳`;
+  }
+  window.addEventListener('online', flushQueue);
+  setInterval(flushQueue, 15e3);
   let toastTimer;
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -942,7 +1011,7 @@
       const j = await api.req(`/videos/${encodeURIComponent(id)}`);
       video.removeAttribute('crossorigin'); $('#srcHint').textContent = '';
       video.src = probeSrc = api.media(id);
-      openProject(j.name || name, null, { id, info: j.info, notes: j.notes });
+      openProject(j.name || name, null, { id, info: j.info, notes: withPending(j.notes, id) });
       $('#urlHint').textContent = '';
     } catch (err) { $('#urlHint').textContent = '打不開這支影片：' + err.message; }
   }
@@ -1224,6 +1293,13 @@
   const playIcon = () => { $('#btnPlay').innerHTML = ic(video.paused ? 'play' : 'pause'); };
   playIcon();
   video.addEventListener('play', playIcon); video.addEventListener('pause', playIcon);
+  function jumpOpen() {
+    const f = frameOf(video.currentTime), open = notes.filter(n => !n.general && !n.done && n.decision !== 'reject');
+    const n = open.find(n => n.frame > f) || open[0];
+    if (!n) { toast('沒有未處理的意見了'); return; }
+    video.pause(); activeId = n.id; seekFrame(n.frame); render(); refreshPt();
+    document.querySelector(`.note[data-id="${n.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   function jumpNote(dir) {
     const f = frameOf(video.currentTime), timed = notes.filter(n => !n.general);
     const n = dir > 0 ? timed.find(n => n.frame > f) : [...timed].reverse().find(n => n.frame < f);
@@ -1534,7 +1610,9 @@
     notes.sort(byTime);
     if (!editing.refs?.length) delete editing.refs;
     refEdit.removed.forEach(dropImage); refEdit = { added: new Set(), removed: new Set() };
+    const resume = settings.autoResume !== false && !editing.general && !video.ended && video.src;
     persist(editing); closeEditor(); render();
+    if (resume) video.play().catch(() => {});
   }
   $('#btnAddText').onclick = () => { openEditor(); $('#edText').focus(); };
   $('#btnAddGeneral').onclick = () => { openEditor(null, true); $('#edText').focus(); };
@@ -2060,6 +2138,7 @@
       case 'l': case 'L': e.preventDefault(); shuttleForward(); break;
       case 'j': case 'J': e.preventDefault(); shuttleBack(); break;
       case '[': case ']': jumpNote(e.key === ']' ? 1 : -1); break;
+      case 'n': case 'N': e.preventDefault(); jumpOpen(); break;
       case 'i': case 'I': e.preventDefault(); setMark('in'); break;
       case 'o': case 'O': e.preventDefault(); setMark('out'); break;
       default: return;
@@ -2455,14 +2534,49 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     $('#setDriveFolder').value = settings.driveFolder; $('#setGKey').value = settings.gKey;
     $('#setAnKey').value = settings.anKey; $('#setPolishModel').value = settings.polishModel;
     $('#setAutoPolish').checked = settings.autoPolish; $('#setPolishImage').checked = settings.polishImage;
+    $('#setAutoResume').checked = settings.autoResume !== false;
     $('#settings').showModal();
   }
   $('#btnSettings').onclick = openSettings;
+  const fmtBytes = b => b > 1e9 ? (b / 1e9).toFixed(2) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.round(b / 1e3) + ' KB';
+  async function runHealth() {
+    const body = $('#healthBody'); body.textContent = '檢查中…（約 5～15 秒）';
+    $('#btnClean').hidden = true; $('#cleanBox').hidden = true;
+    try {
+      const { checks, storage: st } = await api.req('/health');
+      const MARK = { ok: '✓', fail: '!', warn: '?', off: '–' };
+      body.innerHTML = checks.map(c => `<div class="hRow ${c.state}"><span class="dot">${MARK[c.state]}</span><b>${esc(c.name)}</b><span>${esc(c.detail || '')}</span></div>`).join('')
+        + `<div class="hRow off"><span class="dot">≡</span><b>資料庫用量</b><span>${st.videos} 支影片、${st.notes} 則意見、${st.images} 張參考圖，共 ${fmtBytes(st.bytes)}（免費額度 5 GB，${st.bytes / st.limit < 1e-4 ? '用不到 0.01%' : '用了 ' + (st.bytes / st.limit * 100).toFixed(2) + '%'}）</span></div>`;
+      const bad = checks.filter(c => c.state === 'fail').length;
+      body.insertAdjacentHTML('afterbegin', `<p style="margin:0 0 6px">${bad ? `<b style="color:var(--rec)">有 ${bad} 項需要處理</b>，把這個畫面截圖給 Claude 就能告訴你怎麼修。` : '<b>都正常 ✓</b>'}</p>`);
+      $('#btnClean').hidden = false;
+    } catch (err) { body.textContent = '檢查失敗：' + err.message; }
+  }
+  $('#btnHealth').onclick = () => { $('#settings').close(); $('#healthDlg').showModal(); runHealth(); };
+  $('#healthAgain').onclick = runHealth;
+  $('#healthClose').onclick = () => $('#healthDlg').close();
+  $('#btnClean').onclick = async () => {
+    const box = $('#cleanList'); $('#cleanBox').hidden = false; box.textContent = '讀取中…'; $('#cleanGo').disabled = true;
+    try {
+      const { orphans } = await api.req('/cleanup');
+      box.innerHTML = orphans.length ? orphans.map(o => `<label><input type="checkbox" value="${esc(o.id)}"><span><b>${esc(o.name)}</b>
+          <span class="muted">${o.notes} 則意見${o.images ? `、${o.images} 張參考圖` : ''}・${fmtBytes(o.bytes)}</span></span></label>`).join('')
+        : '<span class="muted">沒有需要清理的資料。</span>';
+    } catch (err) { box.textContent = '讀取失敗：' + err.message; }
+  };
+  $('#cleanList').addEventListener('change', () => { $('#cleanGo').disabled = !$('#cleanList').querySelector('input:checked'); });
+  $('#cleanGo').onclick = async () => {
+    const ids = [...$('#cleanList').querySelectorAll('input:checked')].map(i => i.value);
+    if (!ids.length || !confirm(`清除這 ${ids.length} 支影片的意見和參考圖？清掉之後無法復原。`)) return;
+    try { const { cleared } = await api.req('/cleanup', { method: 'POST', json: { ids } }); toast(`已清除 ${cleared} 支影片的舊資料`); $('#btnClean').click(); runHealth(); }
+    catch (err) { toast(err.message); }
+  };
   $('#settings').addEventListener('close', () => {
     Object.assign(settings, { reviewer: $('#setReviewer').value.trim(), engine: $('#setEngine').value,
       elKey: $('#setElKey').value.trim(), oaKey: $('#setOaKey').value.trim(), terms: $('#setTerms').value,
       anKey: $('#setAnKey').value.trim(),
       polishModel: $('#setPolishModel').value, autoPolish: $('#setAutoPolish').checked, polishImage: $('#setPolishImage').checked,
+      autoResume: $('#setAutoResume').checked,
       driveFolder: $('#setDriveFolder').value.trim(), gKey: $('#setGKey').value.trim() });
     store.set('vrn.settings', settings);
     if (api.mode === 'owner')
@@ -2470,8 +2584,17 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     if (!$('#loader').hidden) listDrive();
   });
   // ---------- review status (Frame.io-style: one simple field per video) ----------
+  let guestDue = null;
+  const dueText = due => { const dt = new Date(due + 'T00:00:00'); return `${dt.getMonth() + 1}/${dt.getDate()}（${'日一二三四五六'[dt.getDay()]}）`; };
   function renderStatus() {
     const bar = $('#statusBar');
+    const dn = $('#dueNote'), st0 = project.info?.status;
+    dn.hidden = !(api.mode === 'guest' && guestDue && st0 !== 'approved');
+    if (!dn.hidden) {
+      const late = guestDue < new Date().toLocaleDateString('sv-SE');
+      dn.textContent = late ? `原訂 ${dueText(guestDue)}前回覆` : `請在 ${dueText(guestDue)}前回覆`;
+      dn.classList.toggle('fresh', late);
+    }
     bar.hidden = !(server() && project.remote);
     if (bar.hidden) return;
     const info = project.info || {}, st = info.status || 'review';
@@ -2495,6 +2618,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   // 送出: the client is done; the owner gets one notification with the count
   $('#btnSubmit').onclick = async () => {
     const unsent = notes.filter(n => !n.submitted).length;
+    if (queue.get().length) { toast(`還有 ${queue.get().length} 則意見在等網路上傳，連上網路後再送出。`); flushQueue(); return; }
     if (!unsent || !confirm(`送出 ${unsent} 則修改意見？送出後我們會收到通知，之後還可以再補充。`)) return;
     $('#btnSubmit').disabled = true;
     try {
@@ -2519,8 +2643,23 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
 
   // ---------- share links for outside reviewers (owner) ----------
   const shareUrl = token => `${location.origin}/s/#t=${token}`;
-  const shareMessage = (label, token, expires, hasPin) =>
-    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」：\n${shareUrl(token)}\n（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
+  const shareMessage = (label, token, expires, hasPin, due) =>
+    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」：\n${shareUrl(token)}\n${due ? `麻煩在 ${dueText(due)}前回覆，謝謝！\n` : ''}（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
+  // a short update for LINE: which version is up, and how many of their points from last time were fixed
+  function notifyMessage(sh) {
+    const p = sh.progress, url = shareUrl(sh.token), name = sh.label.replace(/（.*?）|\(.*?\)/g, '').trim();
+    const title = `「${p.current.title}」`, due = sh.due ? `\n麻煩在 ${dueText(sh.due)}前回覆，謝謝！` : '\n看完按「送出修改意見」或「核准」就可以，謝謝！';
+    const late = sh.due && sh.due < new Date().toLocaleDateString('sv-SE');
+    if (late && !p.here.sent && p.status !== 'approved')
+      return `${name} 您好，想跟您確認一下${title}${p.current.label ? ` ${p.current.label}` : ''}看過了嗎？\n連結：${url}\n有要修改的地方直接在影片上留言就可以，謝謝！`;
+    if (p.prev) {
+      const left = p.prev.total - p.prev.fixed;
+      const fixed = !left ? `上一版（${p.prev.label}）您提的 ${p.prev.total} 點都修改好了。`
+        : `上一版（${p.prev.label}）您提的 ${p.prev.total} 點，已修改 ${p.prev.fixed} 點，另外 ${left} 點會再跟您說明。`;
+      return `${name} 您好，${title}的 ${p.current.label} 更新好了。\n${fixed}\n一樣用這個連結看：${url}${due}`;
+    }
+    return `${name} 您好，${title}${p.current.label ? `（${p.current.label}）` : ''}可以看了：\n${url}${due}`;
+  }
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); toast('已複製，可以貼給對方了'); } catch { prompt('請複製這段文字：', t); }
   }
@@ -2532,6 +2671,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   $('#btnShare').onclick = () => {
     $('#shareVideo').textContent = videoName;
     $('#shareResult').hidden = true; $('#shareForm').reset();
+    $('#shDue').min = new Date().toLocaleDateString('sv-SE');
     $('#shareDlg').showModal(); loadShares();
   };
   $('#shareForm').onsubmit = async e => {
@@ -2540,8 +2680,8 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     try {
       const label = $('#shLabel').value.trim();
       const r = await api.req(`/videos/${encodeURIComponent(project.remote)}/shares`, { method: 'POST',
-        json: { label, days: +$('#shDays').value, lockDevice: $('#shLock').checked, pin: $('#shPin').checked } });
-      $('#shareMsg').value = shareMessage(label, r.token, r.expires, !!r.pin);
+        json: { label, days: +$('#shDays').value, lockDevice: $('#shLock').checked, pin: $('#shPin').checked, due: $('#shDue').value || null } });
+      $('#shareMsg').value = shareMessage(label, r.token, r.expires, !!r.pin, $('#shDue').value);
       $('#sharePin').hidden = !r.pin;
       if (r.pin) $('#sharePin').innerHTML = `密碼：<strong style="font-size:20px; letter-spacing:4px">${r.pin}</strong>　<button type="button" data-pin="${r.pin}">複製密碼</button>
         <div class="small muted">請用另一個管道傳給對方，例如連結用 Email、密碼用 LINE。</div>`;
@@ -2556,19 +2696,31 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     catch (err) { if (err.name !== 'AbortError') copyText($('#shareMsg').value); }
   };
   $('#shClose').onclick = () => $('#shareDlg').close();
+  let shareRows = [];
+  function progressText(sh) {
+    const p = sh.progress, parts = [];
+    if (p.current.label) parts.push(`目前連到 ${p.current.label}`);
+    if (p.prev) parts.push(`上一版 ${p.prev.total} 點已修改 ${p.prev.fixed}`);
+    parts.push(p.here.total ? `這一版留了 ${p.here.total} 則${p.here.sent < p.here.total ? `（${p.here.total - p.here.sent} 則還沒送出）` : '，都送出了'}` : '這一版還沒留意見');
+    if (p.status === 'approved') parts.push('已核准');
+    return parts.join('・');
+  }
   async function loadShares() {
     const box = $('#shareList');
     try {
       const { shares, limit } = await api.req(`/videos/${encodeURIComponent(project.remote)}/shares`);
+      shareRows = shares;
       box.innerHTML = shares.length ? shares.map(sh => {
         const last = sh.recent[0], expired = sh.expires < Date.now();
         return `<div class="shareRow" data-id="${esc(sh.id)}" data-token="${esc(sh.token)}" data-label="${esc(sh.label)}" data-expires="${sh.expires}" data-pin="${sh.pin ? 1 : ''}">
           <strong>${esc(sh.label)}</strong>${sh.madeFor && sh.madeFor !== videoName ? `<span class="small muted">（在 ${esc(sh.madeFor)} 分享，會自動開最新版）</span>` : ''}
           ${expired ? '<span class="chip fresh">已過期</span>' : `<span class="chip">到 ${new Date(sh.expires).toLocaleDateString('zh-TW')}</span>`}
+          ${sh.due ? `<span class="chip${sh.due < new Date().toLocaleDateString('sv-SE') && !sh.progress.here.sent && sh.progress.status !== 'approved' ? ' fresh' : ''}">回覆期限 ${dueText(sh.due)}</span>` : ''}
           ${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
           <div>${sh.opens ? `打開 ${sh.opens} 次・最近 ${new Date(last.at).toLocaleString('zh-TW')}${last.place ? '・' + esc(last.place) : ''}・${esc(deviceOf(last.ua))}` : '對方還沒打開'}</div>
           <div>今天語音／AI：${sh.used}／${limit} 次</div>
-          <div class="bar"><button data-act="copy">複製訊息</button>${sh.used >= limit ? `<button data-act="more">再加 ${limit} 次</button>` : ''}<button data-act="revoke">取消分享</button></div>
+          <div class="prog">${progressText(sh)}</div>
+          <div class="bar"><button data-act="notify" class="primary">${ic('copy')}複製通知</button><button data-act="copy">複製邀請</button><button data-act="due">${sh.due ? '改期限' : '設期限'}</button>${sh.used >= limit ? `<button data-act="more">再加 ${limit} 次</button>` : ''}<button data-act="revoke">取消分享</button></div>
         </div>`;
       }).join('') : '還沒有分享給任何人。';
     } catch (err) { box.textContent = '讀取失敗：' + err.message; }
@@ -2577,7 +2729,17 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const act = e.target.dataset.act, row = e.target.closest('.shareRow');
     if (!act || !row) return;
     const d = row.dataset;
-    if (act === 'copy') copyText(shareMessage(d.label, d.token, +d.expires, !!d.pin));
+    const sh = shareRows.find(x => x.id === d.id);
+    if (act === 'copy') copyText(shareMessage(d.label, d.token, +d.expires, !!d.pin, sh?.due));
+    if (act === 'notify' && sh) copyText(notifyMessage(sh));
+    if (act === 'due') {
+      const v = prompt('請對方回覆的期限（例如 2026-11-20，留空 = 不設期限）', sh?.due || new Date(Date.now() + 3 * 86400e3).toLocaleDateString('sv-SE'));
+      if (v === null) return;
+      if (v.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) { toast('日期格式請用 2026-11-20'); return; }
+      await api.req(`/shares/${encodeURIComponent(d.id)}`, { method: 'PATCH', json: { due: v.trim() || null } })
+        .then(() => toast(v.trim() ? '已設定回覆期限，快到期還沒送出時會提醒你' : '已取消期限')).catch(err => toast(err.message));
+      loadShares();
+    }
     if (act === 'revoke' && confirm(`取消分享給「${d.label}」？連結會立刻失效。`)) {
       await api.req(`/shares/${encodeURIComponent(d.id)}`, { method: 'DELETE' }).catch(err => toast(err.message));
       loadShares();
@@ -2617,7 +2779,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     if (!server() || !project.remote || editing || replyOpen || document.hidden || document.activeElement?.isContentEditable) return;
     const id = project.remote;
     try {
-      const { notes: fresh } = await api.req(notesPath());
+      const fresh = withPending((await api.req(notesPath())).notes, id);
       if (editing || id !== project.remote || sig(fresh) === sig(notes)) return;
       notes = fresh.sort(byTime); render();
     } catch {}
@@ -2900,8 +3062,10 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     api.limit = info.limit;
     $('#who').textContent = `${info.name}・審片`;
     video.src = probeSrc = api.media(info.video.id);
-    openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: info.notes });
+    openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: withPending(info.notes, info.video.id) });
     renderPrevious(info.previous);
+    guestDue = info.due; renderStatus();
+    flushQueue();
     if (info.newer && info.previous?.length) toast('這是修改後的新版本，上一版的意見和處理狀態在清單上方。');
     setInterval(syncNotes, 20e3);
     maybeTour();
@@ -2919,6 +3083,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
         $('#otherSrc').open = false;
         $('#who').textContent = me.email;
         loadAlerts(); setInterval(loadAlerts, 60e3);
+        flushQueue();
         setInterval(syncNotes, 20e3);
       }
     } catch {} // no backend here (GitHub Pages, a local file): keys stay in this browser

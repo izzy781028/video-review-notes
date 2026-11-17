@@ -180,7 +180,18 @@ clipnote check
 | `clipnote notes <影片>` | 一支影片的所有意見（`--open` 只看未完成） |
 | `clipnote shot <影片> <意見id> -o 檔名` | 存下意見的截圖 |
 | `clipnote refs <影片> <意見id> [-o 資料夾]` | 下載意見附的參考圖 |
+| `clipnote backup [-o 資料夾]` | 備份所有意見和參考圖（預設 `~/Documents/片語備份`，參考圖只下載新的） |
 | `clipnote decide <影片> <意見id> accept\|adjust\|reject [--note 文字]` | 記下使用者對客戶意見的決定 |
 | `clipnote done <影片> <意見id>` | 標記已修改（`--undo` 改回） |
 | `clipnote upload <檔案> --name <檔名> [--proxy]` | 放進雲端資料夾（`--proxy` 先轉 720p 審片檔） |
 | `clipnote wait <檔名>` | 等 Google Drive 同步到片語 |
+
+## 備份
+
+使用者說「備份片語」「備份審片意見」時跑 `clipnote backup`，回報它印出的數量和資料夾。
+
+使用者要「每週自動備份」時，幫他設定排程（先說明要加什麼、得到同意再加）：
+- macOS / Linux：`crontab -e` 加一行 `0 10 * * 1 /usr/bin/python3 ~/.claude/skills/clipnote-review/clipnote.py backup >> ~/Documents/片語備份/backup.log 2>&1`（每週一早上 10 點；python3 路徑用 `which python3` 確認）。
+- Windows：用「工作排程器」建立每週工作，執行 `python %USERPROFILE%\.claude\skills\clipnote-review\clipnote.py backup`。
+
+片語網頁的「設定 → 系統狀態 → 清理舊資料」會刪掉已不在審片資料夾的影片的意見。使用者要清理前，先跑一次 backup。
