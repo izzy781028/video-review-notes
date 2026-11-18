@@ -114,7 +114,7 @@
 | `GOOGLE_SERVICE_ACCOUNT` | 用文字編輯器打開第 1 步的 JSON 檔，**全選整份內容**貼上 |
 | `ELEVENLABS_API_KEY` | 第 2 步的 Key |
 | `ANTHROPIC_API_KEY` | 第 3 步的 Key |
-| `GUEST_DAILY_LIMIT` | （選填）外部人員每天語音／AI 次數，不填就是 50 |
+| `GUEST_DAILY_LIMIT` | （選填）外部人員每天語音／AI 次數，不填就是 50；之後也可以直接在片語的「設定」裡改 |
 
    `ACCESS_TEAM_DOMAIN`、`ACCESS_AUD` 下一步才拿得到。
 

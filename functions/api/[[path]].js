@@ -7,7 +7,7 @@ import { transcribe, polish, summarize } from '../../lib/ai.js';
 import { saveImage, imageResponse, deleteImage } from '../../lib/images.js';
 import { health, sawService, shareProgress, dueOf, setDue, dueAlerts, exportAll, orphans, cleanup } from '../../lib/ops.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, usedToday, addAllowance, dailyLimit,
-  addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf, followLatest } from '../../lib/core.js';
+  cleanLimit, addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf, followLatest } from '../../lib/core.js';
 
 const OWNER = { author: 'owner' };
 
@@ -29,11 +29,12 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   if (path === '/cleanup' && method === 'POST') return json({ cleared: await cleanup(env, d, (await body(request)).ids) });
 
   if (path === '/me' && method === 'GET')
-    return json({ role: 'owner', email, config: await getConfig(d), drive: !!folderId(env), limit: dailyLimit(env) });
+    return json({ role: 'owner', email, config: await getConfig(d), drive: !!folderId(env), limit: await dailyLimit(d, env) });
 
   if (path === '/config' && method === 'PUT') {
     const input = await body(request), config = await getConfig(d);
     for (const k of Object.keys(DEFAULT_CONFIG)) if (k in input) config[k] = typeof DEFAULT_CONFIG[k] === 'boolean' ? !!input[k] : String(input[k]).slice(0, 20000);
+    if ('guestLimit' in input) config.guestLimit = cleanLimit(input.guestLimit) ? String(cleanLimit(input.guestLimit)) : '';
     await setKv(d, 'config', config);
     return json({ config });
   }
@@ -173,10 +174,11 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
         const last = await d.prepare('SELECT at, ua, place FROM opens WHERE share = ? ORDER BY at DESC LIMIT 5').bind(s.id).all();
         const { results: ppl } = await d.prepare("SELECT DISTINCT json_extract(data, '$.by') AS by FROM notes WHERE author = ?").bind('share:' + s.id).all();
         shares.push({ id: s.id, label: s.label, people: ppl.map(p => p.by).filter(Boolean), token: s.token, pin: s.pin, lockDevice: !!s.lock_device, created: s.created,
+          limit: await dailyLimit(d, env, s.id), ownLimit: cleanLimit(await getKv(d, 'sharelimit:' + s.id, 0)),
           madeFor: s.video_name, follows: !!me, internal: !!(await getKv(d, 'shareinternal:' + s.id, false)), due: await dueOf(d, s.id), progress: await shareProgress(d, s),
           expires: s.expires, opens: s.opens, recent: last.results, used: await usedToday(d, s.id) });
       }
-      return json({ shares, limit: dailyLimit(env) });
+      return json({ shares, limit: await dailyLimit(d, env) });
     }
     if (method === 'POST') {
       const meta = await videoInFolder(env, video);
@@ -191,12 +193,17 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
         .bind(share.id, share.token, video, meta.name, label, share.pin, share.lock, share.created, share.expires).run();
       if (input.due) await setDue(d, share.id, String(input.due));
       if (input.internal) await setKv(d, 'shareinternal:' + share.id, true);
+      if (cleanLimit(input.limit)) await setKv(d, 'sharelimit:' + share.id, cleanLimit(input.limit));
       return json({ id: share.id, token: share.token, pin: share.pin, expires: share.expires });
     }
   }
   if ((m = path.match(/^\/shares\/([\w-]+)$/)) && method === 'PATCH') {
     const input = await body(request);
     if ('due' in input) await setDue(d, m[1], input.due ? String(input.due) : null);
+    if ('limit' in input) {
+      if (cleanLimit(input.limit)) await setKv(d, 'sharelimit:' + m[1], cleanLimit(input.limit));
+      else await d.prepare('DELETE FROM kv WHERE k = ?').bind('sharelimit:' + m[1]).run();
+    }
     return json({ ok: true, due: await dueOf(d, m[1]) });
   }
   if ((m = path.match(/^\/shares\/([\w-]+)$/)) && method === 'DELETE') {
@@ -204,7 +211,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
     return json({ ok: true });
   }
   if ((m = path.match(/^\/shares\/([\w-]+)\/more$/)) && method === 'POST') {
-    await addAllowance(d, m[1], dailyLimit(env));
+    await addAllowance(d, m[1], await dailyLimit(d, env, m[1]));
     return json({ ok: true });
   }
 

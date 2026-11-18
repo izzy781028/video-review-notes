@@ -36,7 +36,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
       role: 'guest', name: share.label, expires: share.expires, due: await dueOf(d, share.id),
       video: { id: share.video, name: meta.name }, info: await getVideo(d, share.video),
       config: { autoPolish: config.autoPolish, polishImage: config.polishImage },
-      limit: dailyLimit(env), used: await usedToday(d, share.id),
+      limit: await dailyLimit(d, env, share.id), used: await usedToday(d, share.id),
       notes: forGuest(await listNotes(d, share.video, share.internal ? undefined : me.author)),
       internal: share.internal, me: me.author, uploaded: files?.find(f => f.id === share.video)?.modifiedTime ? Date.parse(files.find(f => f.id === share.video).modifiedTime) : null,
       previous: await earlierNotes(d, share, me.author), newer: followed || share.video !== share.origVideo,

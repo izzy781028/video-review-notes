@@ -653,6 +653,10 @@
     </select>
     <label style="font-weight:400"><input type="checkbox" id="setAutoPolish" style="width:auto"> 語音辨識完自動潤飾</label>
     <label style="font-weight:400"><input type="checkbox" id="setPolishImage" style="width:auto"> 潤飾時附上該時間點截圖，讓 AI 看畫面寫得更具體</label>
+    <div class="serverOnly ownerOnly">
+      <label>外部人員每天語音／AI 次數 <span class="small muted" style="font-weight:400">（每條分享連結各自算；可在分享清單裡單獨調整）</span></label>
+      <input id="setGuestLimit" type="number" min="1" max="1000" step="1" inputmode="numeric" placeholder="50">
+    </div>
     <div class="bar serverOnly ownerOnly"><button type="button" id="btnHealth"><i data-ic="checkCircle"></i>系統狀態</button>
       <span class="small muted">檢查 Drive、語音、AI、中繼、刪除小幫手、本機 Claude 是否都接好</span></div>
     <div class="localOnly">
@@ -684,6 +688,7 @@
     </div>
     <label style="font-weight:400"><input type="checkbox" id="shLock" style="width:auto"> 只限第一台打開的裝置（轉傳給別人會打不開）</label>
     <label style="font-weight:400"><input type="checkbox" id="shPin" style="width:auto"> 另外加 6 位數密碼（機密案子：連結和密碼分開傳）</label>
+    <label>每天語音／AI 次數（選填）<input id="shLimit" type="number" min="1" max="1000" step="1" inputmode="numeric" style="width:120px; margin-left:8px"></label>
     <label style="font-weight:400"><input type="checkbox" id="shInternal" style="width:auto"> 內部審片：同事看得到所有人的意見（含你的），留意見不會通知你</label>
     <div class="bar"><button class="primary">產生分享連結</button></div>
   </form>
@@ -2587,6 +2592,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     $('#setDriveFolder').value = settings.driveFolder; $('#setGKey').value = settings.gKey;
     $('#setAnKey').value = settings.anKey; $('#setPolishModel').value = settings.polishModel;
     $('#setAutoPolish').checked = settings.autoPolish; $('#setPolishImage').checked = settings.polishImage;
+    $('#setGuestLimit').value = settings.guestLimit || ''; $('#setGuestLimit').placeholder = String(api.limit || 50);
     $('#settings').showModal();
   }
   $('#btnSettings').onclick = openSettings;
@@ -2628,10 +2634,11 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       elKey: $('#setElKey').value.trim(), oaKey: $('#setOaKey').value.trim(), terms: $('#setTerms').value,
       anKey: $('#setAnKey').value.trim(),
       polishModel: $('#setPolishModel').value, autoPolish: $('#setAutoPolish').checked, polishImage: $('#setPolishImage').checked,
+      guestLimit: $('#setGuestLimit').value.trim(),
       driveFolder: $('#setDriveFolder').value.trim(), gKey: $('#setGKey').value.trim() });
     store.set('vrn.settings', settings);
     if (api.mode === 'owner')
-      api.req('/config', { method: 'PUT', json: pickConfig(settings) }).then(() => toast('設定已儲存，所有裝置和分享連結都會套用')).catch(err => toast('設定沒有存到雲端：' + err.message));
+      api.req('/config', { method: 'PUT', json: pickConfig(settings) }).then(r => { if (+r.config?.guestLimit > 0) api.limit = +r.config.guestLimit; }).then(() => toast('設定已儲存，所有裝置和分享連結都會套用')).catch(err => toast('設定沒有存到雲端：' + err.message));
     if (!$('#loader').hidden) listDrive();
   });
   // ---------- review status (Frame.io-style: one simple field per video) ----------
@@ -2710,6 +2717,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     $('#shareVideo').textContent = videoName;
     $('#shareResult').hidden = true; $('#shareForm').reset();
     $('#shDue').min = new Date().toLocaleDateString('sv-SE');
+    $('#shLimit').placeholder = `預設 ${api.limit || 50}`;
     $('#shareDlg').showModal(); loadShares();
   };
   $('#shareForm').onsubmit = async e => {
@@ -2718,7 +2726,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     try {
       const label = $('#shLabel').value.trim();
       const r = await api.req(`/videos/${encodeURIComponent(project.remote)}/shares`, { method: 'POST',
-        json: { label, days: +$('#shDays').value, lockDevice: $('#shLock').checked, pin: $('#shPin').checked, due: $('#shDue').value || null, internal: $('#shInternal').checked } });
+        json: { label, days: +$('#shDays').value, lockDevice: $('#shLock').checked, pin: $('#shPin').checked, due: $('#shDue').value || null, internal: $('#shInternal').checked, limit: +$('#shLimit').value || null } });
       $('#shareMsg').value = shareMessage(label, r.token, r.expires, !!r.pin, $('#shDue').value);
       $('#sharePin').hidden = !r.pin;
       if (r.pin) $('#sharePin').innerHTML = `密碼：<strong style="font-size:20px; letter-spacing:4px">${r.pin}</strong>　<button type="button" data-pin="${r.pin}">複製密碼</button>
@@ -2756,9 +2764,9 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
           ${sh.due ? `<span class="chip${sh.due < new Date().toLocaleDateString('sv-SE') && !sh.progress.here.total && sh.progress.status !== 'approved' ? ' fresh' : ''}">回覆期限 ${dueText(sh.due)}</span>` : ''}
           ${sh.internal ? '<span class="chip st-changes">內部</span>' : ''}${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
           <div>${sh.opens ? `打開 ${sh.opens} 次・最近 ${new Date(last.at).toLocaleString('zh-TW')}${last.place ? '・' + esc(last.place) : ''}・${esc(deviceOf(last.ua))}` : '對方還沒打開'}</div>
-          <div>今天語音／AI：${sh.used}／${limit} 次</div>
+          <div>今天語音／AI：${sh.used}／${sh.limit} 次${sh.ownLimit ? '（這條連結自訂）' : ''} <button class="small ghost" data-act="limit">改次數</button></div>
           <div class="prog">${progressText(sh)}</div>
-          <div class="bar"><button data-act="notify" class="primary">${ic('copy')}複製通知</button><button data-act="copy">複製邀請</button><button data-act="due">${sh.due ? '改期限' : '設期限'}</button>${sh.used >= limit ? `<button data-act="more">再加 ${limit} 次</button>` : ''}<button data-act="revoke">取消分享</button></div>
+          <div class="bar"><button data-act="notify" class="primary">${ic('copy')}複製通知</button><button data-act="copy">複製邀請</button><button data-act="due">${sh.due ? '改期限' : '設期限'}</button>${sh.used >= sh.limit ? `<button data-act="more">今天再加 ${sh.limit} 次</button>` : ''}<button data-act="revoke">取消分享</button></div>
         </div>`;
       }).join('') : '還沒有分享給任何人。';
     } catch (err) { box.textContent = '讀取失敗：' + err.message; }
@@ -2770,6 +2778,14 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const sh = shareRows.find(x => x.id === d.id);
     if (act === 'copy') copyText(shareMessage(d.label, d.token, +d.expires, !!d.pin, sh?.due));
     if (act === 'notify' && sh) copyText(notifyMessage(sh));
+    if (act === 'limit' && sh) {
+      const v = prompt(`這條連結每天可以用幾次語音辨識／AI 潤飾？（1～1000；留空 = 跟設定一樣，目前 ${api.limit} 次）`, sh.ownLimit || '');
+      if (v === null) return;
+      if (v.trim() && !(+v >= 1 && +v <= 1000)) { toast('請填 1～1000 的數字'); return; }
+      await api.req(`/shares/${encodeURIComponent(d.id)}`, { method: 'PATCH', json: { limit: v.trim() ? Math.round(+v) : null } })
+        .then(() => toast(v.trim() ? `已改成每天 ${Math.round(+v)} 次` : '已改回預設次數')).catch(err => toast(err.message));
+      loadShares();
+    }
     if (act === 'due') {
       const v = prompt('請對方回覆的期限（例如 2026-11-20，留空 = 不設期限）', sh?.due || new Date(Date.now() + 3 * 86400e3).toLocaleDateString('sv-SE'));
       if (v === null) return;
@@ -2797,7 +2813,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       bar.hidden = !alerts.length;
       const more = alerts.length > 2 ? `<span class="small muted">還有 ${alerts.length - 2} 則較早的通知</span>` : '';
       bar.innerHTML = alerts.slice(0, 2).map(a => `<div class="alert">${ic('bell')}<span>${esc(a.text)}</span>
-        ${a.kind === 'limit' && a.share ? `<button data-more="${esc(a.share)}">再加 ${api.limit} 次</button>` : '<span></span>'}
+        ${a.kind === 'limit' && a.share ? `<button data-more="${esc(a.share)}">今天再加一份</button>` : '<span></span>'}
         <time>${new Date(a.at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></div>`).join('')
         + `<div class="row">${more}<span style="flex:1"></span><button data-seen="1" class="ghost">知道了</button></div>`;
     } catch {}
@@ -3072,7 +3088,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   themeIcon();
 
   // ---------- start ----------
-  const CONFIG_KEYS = ['reviewer', 'terms', 'polishModel', 'autoPolish', 'polishImage'];
+  const CONFIG_KEYS = ['reviewer', 'terms', 'polishModel', 'autoPolish', 'polishImage', 'guestLimit'];
   const pickConfig = c => Object.fromEntries(CONFIG_KEYS.filter(k => k in c).map(k => [k, c[k]]));
 
   function showGate(msg, askPin) {
