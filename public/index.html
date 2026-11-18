@@ -684,6 +684,7 @@
     </div>
     <label style="font-weight:400"><input type="checkbox" id="shLock" style="width:auto"> 只限第一台打開的裝置（轉傳給別人會打不開）</label>
     <label style="font-weight:400"><input type="checkbox" id="shPin" style="width:auto"> 另外加 6 位數密碼（機密案子：連結和密碼分開傳）</label>
+    <label style="font-weight:400"><input type="checkbox" id="shInternal" style="width:auto"> 內部審片：同事看得到所有人的意見（含你的），留意見不會通知你</label>
     <div class="bar"><button class="primary">產生分享連結</button></div>
   </form>
   <div id="shareResult" hidden>
@@ -824,7 +825,8 @@
   // guests: who is using this device, for links shared with several colleagues
   const guestMe = { rid: '', name: '', people: {} };
   const meKey = () => 'vrn.me.' + api.token.slice(0, 16);
-  const mine = n => api.mode !== 'guest' || !n.rid || n.rid === guestMe.rid;
+  let guestAuthor = '';
+  const mine = n => api.mode !== 'guest' || ((!n.author || !guestAuthor || n.author === guestAuthor) && (!n.rid || n.rid === guestMe.rid));
   const api = {
     mode: 'local', token: '', pin: '', limit: 50,
     async req(path, opts = {}) {
@@ -1032,7 +1034,8 @@
       const j = await api.req(`/videos/${encodeURIComponent(id)}`);
       video.removeAttribute('crossorigin'); $('#srcHint').textContent = '';
       video.src = probeSrc = api.media(id);
-      openProject(j.name || name, null, { id, info: j.info, notes: withPending(j.notes, id) });
+      openProject(j.name || name, null, { id, info: j.info, notes: withPending(j.notes, id), uploaded: j.uploaded });
+      overwriteHint();
       $('#urlHint').textContent = '';
     } catch (err) { $('#urlHint').textContent = '打不開這支影片：' + err.message; }
   }
@@ -1093,7 +1096,7 @@
   $('#driveRefresh').onclick = listDrive;
   function openProject(name, key, remote) {
     videoName = name; videoKey = key || '';
-    project = { remote: remote?.id || null, info: remote?.info || null };
+    project = { remote: remote?.id || null, info: remote?.info || null, uploaded: remote?.uploaded || null };
     const saved = remote ? { notes: remote.notes, fps: remote.info?.fps, startTc: remote.info?.startTc,
       fpsSource: remote.info?.fpsSource, startTcSource: remote.info?.startTcSource } : store.get(videoKey, null);
     notes = saved?.notes || [];
@@ -1980,6 +1983,13 @@
       + (replyOpen === n.id ? `<form class="replyForm" data-id="${esc(n.id)}"><input name="t" placeholder="寫回覆…" autocomplete="off" maxlength="2000" aria-label="回覆">
         <button class="primary">送出</button></form>` : '');
   }
+  // the file was overwritten after the note was written (internal rounds keep one file name)
+  const earlierRound = n => project.uploaded && !n.carried && n.created && Date.parse(n.created) < project.uploaded - 60e3;
+  const fmtWhen = t => new Date(t).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  function overwriteHint() {
+    const old = notes.filter(n => earlierRound(n) && !n.done).length;
+    if (old) toast(`影片在 ${fmtWhen(project.uploaded)} 換過新檔，標「上一輪」的 ${old} 則是之前留的，請對照新畫面。`);
+  }
   function render() {
     const f = api.mode === 'guest' && !['all', 'open'].includes(listFilter) ? 'all' : listFilter, q = query.trim().toLowerCase();
     $('#filterSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.f === f));
@@ -1995,7 +2005,8 @@
             <button class="tcbtn" data-act="seek">${label(n)}</button>
             <span class="chip">#${notes.indexOf(n) + 1}</span>
             ${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}
-            <span class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}${api.mode === 'owner' && n.group && n.group !== n.by ? `<span class="muted">・${esc(n.group)}</span>` : ''}</span>
+            ${earlierRound(n) ? `<span class="chip" title="影片 ${fmtWhen(project.uploaded)} 換過新檔，這則是之前留的">上一輪</span>` : ''}
+            <span class="who">${avatar(n.by || (n.author === 'owner' ? '剪輯' : ''), isClient(n) && n.author !== 'owner')}${esc(n.by || (n.author === 'owner' && api.mode === 'guest' ? '剪輯' : ''))}${api.mode === 'owner' && n.group && n.group !== n.by ? `<span class="muted">・${esc(n.group)}</span>` : ''}</span>
 
           </div>
           ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 ${esc(vlabel(n.carried))} 帶入・時間碼可能已隨剪接變動</div>` : ''}
@@ -2707,7 +2718,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     try {
       const label = $('#shLabel').value.trim();
       const r = await api.req(`/videos/${encodeURIComponent(project.remote)}/shares`, { method: 'POST',
-        json: { label, days: +$('#shDays').value, lockDevice: $('#shLock').checked, pin: $('#shPin').checked, due: $('#shDue').value || null } });
+        json: { label, days: +$('#shDays').value, lockDevice: $('#shLock').checked, pin: $('#shPin').checked, due: $('#shDue').value || null, internal: $('#shInternal').checked } });
       $('#shareMsg').value = shareMessage(label, r.token, r.expires, !!r.pin, $('#shDue').value);
       $('#sharePin').hidden = !r.pin;
       if (r.pin) $('#sharePin').innerHTML = `密碼：<strong style="font-size:20px; letter-spacing:4px">${r.pin}</strong>　<button type="button" data-pin="${r.pin}">複製密碼</button>
@@ -2743,7 +2754,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
           <strong>${esc(sh.label || '公開連結')}</strong>${sh.people?.length ? `<span class="small muted">（${esc(sh.people.join('、'))}）</span>` : !sh.label ? '<span class="small muted">（每個人自己填名字）</span>' : ''}${sh.madeFor && sh.madeFor !== videoName ? `<span class="small muted">（在 ${esc(sh.madeFor)} 分享，會自動開最新版）</span>` : ''}
           ${expired ? '<span class="chip fresh">已過期</span>' : `<span class="chip">到 ${new Date(sh.expires).toLocaleDateString('zh-TW')}</span>`}
           ${sh.due ? `<span class="chip${sh.due < new Date().toLocaleDateString('sv-SE') && !sh.progress.here.total && sh.progress.status !== 'approved' ? ' fresh' : ''}">回覆期限 ${dueText(sh.due)}</span>` : ''}
-          ${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
+          ${sh.internal ? '<span class="chip st-changes">內部</span>' : ''}${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
           <div>${sh.opens ? `打開 ${sh.opens} 次・最近 ${new Date(last.at).toLocaleString('zh-TW')}${last.place ? '・' + esc(last.place) : ''}・${esc(deviceOf(last.ua))}` : '對方還沒打開'}</div>
           <div>今天語音／AI：${sh.used}／${limit} 次</div>
           <div class="prog">${progressText(sh)}</div>
@@ -3124,7 +3135,10 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     api.limit = info.limit;
     showMe();
     video.src = probeSrc = api.media(info.video.id);
-    openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: withPending(info.notes, info.video.id) });
+    guestAuthor = info.me || '';
+    if (info.internal) document.body.classList.add('internal');
+    openProject(info.video.name, null, { id: info.video.id, info: info.info, notes: withPending(info.notes, info.video.id), uploaded: info.uploaded });
+    overwriteHint();
     renderPrevious(info.previous);
     guestDue = info.due; renderStatus();
     flushQueue();

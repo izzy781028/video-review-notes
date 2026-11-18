@@ -2,7 +2,7 @@
 import { HttpError, json, handle, body, randomId } from '../../lib/http.js';
 import { db, getConfig, setKv, getKv, DEFAULT_CONFIG } from '../../lib/db.js';
 import { ownerEmail } from '../../lib/auth.js';
-import { folderId, listVideos, videoInFolder, streamVideo, canTrash, trashVideo } from '../../lib/google.js';
+import { folderId, listVideos, videoInFolder, streamVideo, canTrash, trashVideo, fileModified } from '../../lib/google.js';
 import { transcribe, polish, summarize } from '../../lib/ai.js';
 import { saveImage, imageResponse, deleteImage } from '../../lib/images.js';
 import { health, sawService, shareProgress, dueOf, setDue, dueAlerts, exportAll, orphans, cleanup } from '../../lib/ops.js';
@@ -68,7 +68,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
       const seen = await getKv(d, 'seen', {});
       seen[id] = Date.now();
       await setKv(d, 'seen', seen);
-      return json({ id, name: meta.name, info: await getVideo(d, id), notes: await listNotes(d, id) });
+      return json({ id, name: meta.name, info: await getVideo(d, id), notes: await listNotes(d, id), uploaded: await fileModified(env, id) });
     }
     if (method === 'PATCH') {
       const input = await body(request), patch = {};
@@ -173,7 +173,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
         const last = await d.prepare('SELECT at, ua, place FROM opens WHERE share = ? ORDER BY at DESC LIMIT 5').bind(s.id).all();
         const { results: ppl } = await d.prepare("SELECT DISTINCT json_extract(data, '$.by') AS by FROM notes WHERE author = ?").bind('share:' + s.id).all();
         shares.push({ id: s.id, label: s.label, people: ppl.map(p => p.by).filter(Boolean), token: s.token, pin: s.pin, lockDevice: !!s.lock_device, created: s.created,
-          madeFor: s.video_name, follows: !!me, due: await dueOf(d, s.id), progress: await shareProgress(d, s),
+          madeFor: s.video_name, follows: !!me, internal: !!(await getKv(d, 'shareinternal:' + s.id, false)), due: await dueOf(d, s.id), progress: await shareProgress(d, s),
           expires: s.expires, opens: s.opens, recent: last.results, used: await usedToday(d, s.id) });
       }
       return json({ shares, limit: dailyLimit(env) });
@@ -190,6 +190,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(share.id, share.token, video, meta.name, label, share.pin, share.lock, share.created, share.expires).run();
       if (input.due) await setDue(d, share.id, String(input.due));
+      if (input.internal) await setKv(d, 'shareinternal:' + share.id, true);
       return json({ id: share.id, token: share.token, pin: share.pin, expires: share.expires });
     }
   }

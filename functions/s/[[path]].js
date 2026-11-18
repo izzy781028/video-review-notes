@@ -2,7 +2,7 @@
 // Cloudflare Access is bypassed for /s; the share token (plus optional PIN / device lock) is the gate.
 import { HttpError, json, handle, body } from '../../lib/http.js';
 import { getConfig } from '../../lib/db.js';
-import { videoInFolder, streamVideo, listVideos } from '../../lib/google.js';
+import { videoInFolder, streamVideo, listVideos, fileModified } from '../../lib/google.js';
 import { transcribe, polish } from '../../lib/ai.js';
 import { resolveShare, who, whoLabel } from '../../lib/share.js';
 import { saveImage, imageResponse, deleteImage, inShareFamily, spendImage } from '../../lib/images.js';
@@ -37,24 +37,25 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
       video: { id: share.video, name: meta.name }, info: await getVideo(d, share.video),
       config: { autoPolish: config.autoPolish, polishImage: config.polishImage },
       limit: dailyLimit(env), used: await usedToday(d, share.id),
-      notes: forGuest(await listNotes(d, share.video, me.author)),
+      notes: forGuest(await listNotes(d, share.video, share.internal ? undefined : me.author)),
+      internal: share.internal, me: me.author, uploaded: files?.find(f => f.id === share.video)?.modifiedTime ? Date.parse(files.find(f => f.id === share.video).modifiedTime) : null,
       previous: await earlierNotes(d, share, me.author), newer: followed || share.video !== share.origVideo,
     }));
   }
   if (path === '/media') return withCookies(await streamVideo(env, share.video, request));
 
-  if (path === '/notes' && method === 'GET') return json({ notes: forGuest(await listNotes(d, share.video, me.author)) });
+  if (path === '/notes' && method === 'GET') return json({ notes: forGuest(await listNotes(d, share.video, share.internal ? undefined : me.author)) });
   if ((m = path.match(/^\/notes\/([\w-]+)$/))) {
     if (method === 'PUT') {
       await putNote(d, share.video, m[1], await body(request), me);
-      waitUntil(noteActivity(d, env, share, me, share.video, m[1]).catch(err => console.error('note alert', err)));
+      if (!share.internal) waitUntil(noteActivity(d, env, share, me, share.video, m[1]).catch(err => console.error('note alert', err)));
       return json({ ok: true });
     }
     if (method === 'DELETE') { await deleteNote(d, share.video, m[1], me); return json({ ok: true }); }
   }
   if ((m = path.match(/^\/notes\/([\w-]+)\/replies$/)) && method === 'POST') {
-    const reply = await addReply(d, share.video, m[1], (await body(request)).text, me);
-    waitUntil(notify(d, env, 'reply', `${whoLabel(me)} 在「${share.video_name}」回覆：${reply.text.slice(0, 60)}`, share.id));
+    const reply = await addReply(d, share.video, m[1], (await body(request)).text, { ...me, team: share.internal });
+    if (!share.internal) waitUntil(notify(d, env, 'reply', `${whoLabel(me)} 在「${share.video_name}」回覆：${reply.text.slice(0, 60)}`, share.id));
     return json({ reply });
   }
   if ((m = path.match(/^\/replies\/([\w-]+)$/)) && method === 'DELETE') { await deleteReply(d, share.video, m[1], me); return json({ ok: true }); }
@@ -79,7 +80,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
     const { status } = await body(request);
     if (!(status in STATUSES) || status === 'review') throw new HttpError(400, '狀態錯誤');
     const info = await patchVideo(d, share.video, { status, statusBy: whoLabel(me), statusAt: Date.now() });
-    waitUntil(notify(d, env, 'status', `${whoLabel(me)} 把「${share.video_name}」標為「${STATUSES[status]}」`, share.id));
+    if (!share.internal) waitUntil(notify(d, env, 'status', `${whoLabel(me)} 把「${share.video_name}」標為「${STATUSES[status]}」`, share.id));
     return json({ info });
   }
 

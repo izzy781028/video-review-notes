@@ -329,7 +329,7 @@ def cmd_upload(conf, a):
         die(f'檔名「{name}」不符合規則：YYYYMMDD_專案_內容_版本.mp4，版本寫 A Copy／B Copy…、Final 或 v2，'
             '例如「20261018_夏日新品_形象片_B Copy.mp4」。用 --name 指定')
     dest = drive / name
-    if dest.exists():
+    if dest.exists() and not a.replace:
         die(f'雲端資料夾已經有「{name}」。新版本請用下一個版本（{next_version(name)}），不要覆蓋舊檔')
     info = probe(src)
     if not a.proxy and info and (info.get('codec_name') != 'h264' or max(info.get('width', 0), info.get('height', 0)) > 1920):
@@ -378,6 +378,7 @@ def main():
     s = sub.add_parser('backup', help='備份所有意見和參考圖到電腦'); s.add_argument('-o', '--output', help='備份資料夾（預設 ~/Documents/片語備份）')
     s = sub.add_parser('refs', help='下載一則意見附的參考圖'); s.add_argument('video'); s.add_argument('note'); s.add_argument('-o', '--output', help='存放的資料夾')
     s = sub.add_parser('upload', help='把審片檔放進雲端資料夾'); s.add_argument('file'); s.add_argument('--name'); s.add_argument('--proxy', action='store_true')
+    s.add_argument('--replace', action='store_true', help='內部審片：覆蓋同名檔（Drive 沿用同一個檔案，意見留在原處）')
     s = sub.add_parser('wait', help='等檔案同步到片語'); s.add_argument('name'); s.add_argument('--minutes', type=int, default=10)
     a = p.parse_args()
     conf = config()
