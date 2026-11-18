@@ -169,7 +169,8 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
         if (files) { const cur = await getKv(d, 'sharecur:' + s.id, null);
           await followLatest(d, { id: s.id, origName: s.video_name, video: cur?.id || s.video, video_name: cur?.name || s.video_name }, files); }
         const last = await d.prepare('SELECT at, ua, place FROM opens WHERE share = ? ORDER BY at DESC LIMIT 5').bind(s.id).all();
-        shares.push({ id: s.id, label: s.label, token: s.token, pin: s.pin, lockDevice: !!s.lock_device, created: s.created,
+        const { results: ppl } = await d.prepare("SELECT DISTINCT json_extract(data, '$.by') AS by FROM notes WHERE author = ?").bind('share:' + s.id).all();
+        shares.push({ id: s.id, label: s.label, people: ppl.map(p => p.by).filter(Boolean), token: s.token, pin: s.pin, lockDevice: !!s.lock_device, created: s.created,
           madeFor: s.video_name, follows: !!me, due: await dueOf(d, s.id), progress: await shareProgress(d, s),
           expires: s.expires, opens: s.opens, recent: last.results, used: await usedToday(d, s.id) });
       }
@@ -179,7 +180,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
       const meta = await videoInFolder(env, video);
       const input = await body(request);
       const label = String(input.label || '').trim().slice(0, 40);
-      if (!label) throw new HttpError(400, '請填對方的名字');
+      // the label is optional: an open link where everyone types their own name
       const days = Math.min(90, Math.max(1, +input.days || 14));
       const share = { id: randomId(9), token: randomId(24), label, pin: input.pin ? String(crypto.getRandomValues(new Uint32Array(1))[0] % 1e6).padStart(6, '0') : null,
         lock: input.lockDevice ? 1 : 0, created: Date.now(), expires: Date.now() + days * 86400e3 };

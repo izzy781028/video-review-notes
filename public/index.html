@@ -674,8 +674,8 @@
   <h3 style="margin-top:0" class="iconLabel"><i data-ic="link"></i>分享給外部審片</h3>
   <div class="small muted" id="shareVideo"></div>
   <form id="shareForm">
-    <label>對方（公司或窗口的名字；同事一起看時，每個人打開會再填自己的名字）</label>
-    <input id="shLabel" type="text" placeholder="例如：王小姐（客戶）" required>
+    <label>對方（選填）<span class="small muted" style="font-weight:400">每個人打開連結會自己填名字；這裡寫公司或窗口，方便你分辨是哪一條連結</span></label>
+    <input id="shLabel" type="text" placeholder="例如：ABC 公司（可以留空）">
     <div class="bar">
       <label style="flex:1; margin:0">連結有效
         <select id="shDays"><option value="3">3 天</option><option value="7">7 天</option><option value="14" selected>14 天</option><option value="30">30 天</option></select>
@@ -2691,21 +2691,21 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   // ---------- share links for outside reviewers (owner) ----------
   const shareUrl = token => `${location.origin}/s/#t=${token}`;
   const shareMessage = (label, token, expires, hasPin, due) =>
-    `【片語・審片】${videoName}\n${label} 您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」。同事也可以用同一個連結，打開時填自己的名字就好：\n${shareUrl(token)}\n${due ? `麻煩在 ${dueText(due)}前回覆，謝謝！\n` : ''}（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
+    `【片語・審片】${videoName}\n${label ? label + ' ' : ''}您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」。同事也可以用同一個連結，打開時填自己的名字就好：\n${shareUrl(token)}\n${due ? `麻煩在 ${dueText(due)}前回覆，謝謝！\n` : ''}（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
   // a short update for LINE: which version is up, and how many of their points from last time were fixed
   function notifyMessage(sh) {
-    const p = sh.progress, url = shareUrl(sh.token), name = sh.label.replace(/（.*?）|\(.*?\)/g, '').trim();
+    const p = sh.progress, url = shareUrl(sh.token), name = sh.label.replace(/（.*?）|\(.*?\)/g, '').trim(), hi = name ? name + ' 您好' : '您好';
     const title = `「${p.current.title}」`, due = sh.due ? `\n麻煩在 ${dueText(sh.due)}前回覆，謝謝！` : '\n看完按「送出修改意見」或「核准」就可以，謝謝！';
     const late = sh.due && sh.due < new Date().toLocaleDateString('sv-SE');
     if (late && !p.here.sent && p.status !== 'approved')
-      return `${name} 您好，想跟您確認一下${title}${p.current.label ? ` ${p.current.label}` : ''}看過了嗎？\n連結：${url}\n有要修改的地方直接在影片上留言就可以，謝謝！`;
+      return `${hi}，想跟您確認一下${title}${p.current.label ? ` ${p.current.label}` : ''}看過了嗎？\n連結：${url}\n有要修改的地方直接在影片上留言就可以，謝謝！`;
     if (p.prev) {
       const left = p.prev.total - p.prev.fixed;
       const fixed = !left ? `上一版（${p.prev.label}）您提的 ${p.prev.total} 點都修改好了。`
         : `上一版（${p.prev.label}）您提的 ${p.prev.total} 點，已修改 ${p.prev.fixed} 點，另外 ${left} 點會再跟您說明。`;
-      return `${name} 您好，${title}的 ${p.current.label} 更新好了。\n${fixed}\n一樣用這個連結看：${url}${due}`;
+      return `${hi}，${title}的 ${p.current.label} 更新好了。\n${fixed}\n一樣用這個連結看：${url}${due}`;
     }
-    return `${name} 您好，${title}${p.current.label ? `（${p.current.label}）` : ''}可以看了：\n${url}${due}`;
+    return `${hi}，${title}${p.current.label ? `（${p.current.label}）` : ''}可以看了：\n${url}${due}`;
   }
   async function copyText(t) {
     try { await navigator.clipboard.writeText(t); toast('已複製，可以貼給對方了'); } catch { prompt('請複製這段文字：', t); }
@@ -2760,7 +2760,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       box.innerHTML = shares.length ? shares.map(sh => {
         const last = sh.recent[0], expired = sh.expires < Date.now();
         return `<div class="shareRow" data-id="${esc(sh.id)}" data-token="${esc(sh.token)}" data-label="${esc(sh.label)}" data-expires="${sh.expires}" data-pin="${sh.pin ? 1 : ''}">
-          <strong>${esc(sh.label)}</strong>${sh.madeFor && sh.madeFor !== videoName ? `<span class="small muted">（在 ${esc(sh.madeFor)} 分享，會自動開最新版）</span>` : ''}
+          <strong>${esc(sh.label || '公開連結')}</strong>${sh.people?.length ? `<span class="small muted">（${esc(sh.people.join('、'))}）</span>` : !sh.label ? '<span class="small muted">（每個人自己填名字）</span>' : ''}${sh.madeFor && sh.madeFor !== videoName ? `<span class="small muted">（在 ${esc(sh.madeFor)} 分享，會自動開最新版）</span>` : ''}
           ${expired ? '<span class="chip fresh">已過期</span>' : `<span class="chip">到 ${new Date(sh.expires).toLocaleDateString('zh-TW')}</span>`}
           ${sh.due ? `<span class="chip${sh.due < new Date().toLocaleDateString('sv-SE') && !sh.progress.here.sent && sh.progress.status !== 'approved' ? ' fresh' : ''}">回覆期限 ${dueText(sh.due)}</span>` : ''}
           ${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
@@ -2787,7 +2787,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
         .then(() => toast(v.trim() ? '已設定回覆期限，快到期還沒送出時會提醒你' : '已取消期限')).catch(err => toast(err.message));
       loadShares();
     }
-    if (act === 'revoke' && confirm(`取消分享給「${d.label}」？連結會立刻失效。`)) {
+    if (act === 'revoke' && confirm(`取消分享給「${d.label || '公開連結'}」？連結會立刻失效。`)) {
       await api.req(`/shares/${encodeURIComponent(d.id)}`, { method: 'DELETE' }).catch(err => toast(err.message));
       loadShares();
     }
