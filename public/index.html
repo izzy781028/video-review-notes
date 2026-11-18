@@ -1996,7 +1996,7 @@
     }
     $('#list').innerHTML = shown.length ? shown.map(n => `
       <div class="note${n.done ? ' done' : ''}${n.general ? ' general' : ''}${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
-        <img src="${n.thumb || ''}" data-act="seek" alt="">
+        <img src="${esc(n.thumb || '')}" data-act="seek" alt="">
         <div>
           <div class="meta">
             <button class="tcbtn" data-act="seek">${label(n)}</button>
@@ -2048,7 +2048,7 @@
   }
   function showTip(n, el) {
     const tip = $('#tlTip'), tl = $('#timeline'), w = tl.clientWidth;
-    tip.innerHTML = `${n.thumb ? `<img src="${n.thumb}" alt="">` : ''}<div class="mono"><b>${label(n)}</b>　<span class="chip">#${notes.indexOf(n) + 1}</span></div>
+    tip.innerHTML = `${n.thumb ? `<img src="${esc(n.thumb)}" alt="">` : ''}<div class="mono"><b>${label(n)}</b>　<span class="chip">#${notes.indexOf(n) + 1}</span></div>
       <div class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}</div><div class="t">${esc(n.text)}</div>`;
     const x = el.offsetLeft + (el.classList.contains('band') ? 0 : el.offsetWidth / 2);
     tip.style.left = Math.min(w - 120, Math.max(120, x)) + 'px';
@@ -2219,7 +2219,7 @@
 
   $('#btnCsv').onclick = () => {
     if (!need()) return;
-    const q = v => `"${String(v).replace(/"/g, '""')}"`;
+    const q = v => `"${String(v).replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""')}"`;
     download(base() + '.csv', '\ufeff' + [HEAD, ...rows()].map(r => r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
   };
   $('#btnCopy').onclick = async () => {
@@ -2267,7 +2267,7 @@
     const rate = `<rate><timebase>${tb}</timebase><ntsc>${ntsc ? 'TRUE' : 'FALSE'}</ntsc></rate>`;
     const w = video.videoWidth || 1920, h = video.videoHeight || 1080;
     const markers = timed.map(n =>
-      `<marker><name>${x(`#${notes.indexOf(n) + 1}${n.cat ? ' ' + n.cat : ''}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${n.frame}</in><out>${n.frame2 ?? -1}</out></marker>`).join('\n      ');
+      `<marker><name>${x(`#${notes.indexOf(n) + 1}${n.cat ? ' ' + n.cat : ''}`)}</name><comment>${x(n.text + (n.by ? `（${n.by}）` : ''))}</comment><in>${Math.round(+n.frame) || 0}</in><out>${n.frame2 != null ? Math.round(+n.frame2) || 0 : -1}</out></marker>`).join('\n      ');
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE xmeml>
 <xmeml version="4">

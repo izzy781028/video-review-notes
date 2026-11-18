@@ -15,6 +15,8 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   const url = new URL(request.url);
   const path = '/' + [].concat(params.path || []).join('/');
   const method = request.method;
+  // browsers say where a request came from; scripts (clipnote.py, Claude Code) send nothing and are not affected
+  if (method !== 'GET' && request.headers.get('sec-fetch-site') === 'cross-site') throw new HttpError(403, '不接受從其他網站送出的請求');
   const email = await ownerEmail(request, env);
   const d = await db(env);
   if (email === 'local-claude') waitUntil(sawService(d));

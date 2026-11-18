@@ -177,6 +177,7 @@ const rpcError = (id, code, message, status = 200) =>
 
 export async function onRequest(ctx) {
   const { request, env, waitUntil } = ctx;
+  if (request.headers.get('sec-fetch-site') === 'cross-site') return rpcError(null, -32001, '不接受從其他網站送出的請求', 403);
   if (request.method !== 'POST') return new Response('POST JSON-RPC messages here (MCP Streamable HTTP).', { status: 405, headers: { allow: 'POST' } });
   try { await ownerEmail(request, env); } catch (err) { return rpcError(null, -32001, err.message, err.status || 401); }
   let msg;
