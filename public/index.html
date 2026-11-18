@@ -369,8 +369,6 @@
   body.guest .viewTools, body.guest .kbdhint, body.guest #fpsBadge, body.guest button kbd, body.guest .listTools,
   body.guest #drawTools, body.guest #btnUndoDraw, body.guest #btnOut, body.guest #btnOutClear,
   body.guest .transport [data-step="-1f"], body.guest .transport [data-step="+1f"] { display: none !important; }
-  .chip.unsent { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
-  #btnSubmit { font-weight: 600; }
   #prevNotes { margin: 0 0 12px; padding: 10px 12px; border-radius: 18px; background: var(--glass-flat); border: 1px solid var(--glass-border); }
   #prevNotes summary { cursor: pointer; font-weight: 600; }
   #prevNotes .pnote { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
@@ -588,7 +586,7 @@
       <button id="btnMe" class="guestOnly ghost small" title="換成別人的名字（同一台裝置給同事用時）"></button>
       <span class="spacer" style="flex:1"></span>
       <span class="seg">
-      <button id="btnSubmit" class="guestOnly"><i data-ic="share"></i>送出修改意見</button>
+      <span class="guestOnly small muted iconLabel" style="padding:0 8px"><i data-ic="checkCircle"></i>意見存了就會傳給我們</span>
       <button data-status="approved"><i data-ic="checkCircle"></i>核准</button>
       <button data-status="changes" class="ownerOnly"><i data-ic="pencil"></i>需要修改</button>
       <button data-status="review" class="ownerOnly"><i data-ic="undo"></i>改回待審</button>
@@ -819,7 +817,8 @@
     store.get('vrn.settings', {}));
 
   let videoName = '', videoKey = '', notes = [], editing = null, activeId = null;
-  let refEdit = { added: new Set(), removed: new Set() }; // reference images uploaded / removed while the editor is open
+  let refEdit = { added: new Set(), removed: new Set() };
+  let savedOnce = false; // guests: say once that a saved note has already reached us // reference images uploaded / removed while the editor is open
 
   // ---------- backend: 'local' (keys in this browser), 'owner' (signed in via Cloudflare) or 'guest' (share link) ----------
   // guests: who is using this device, for links shared with several colleagues
@@ -1660,6 +1659,7 @@
     if (!editing.refs?.length) delete editing.refs;
     refEdit.removed.forEach(dropImage); refEdit = { added: new Set(), removed: new Set() };
     persist(editing); closeEditor(); render();
+    if (api.mode === 'guest' && !savedOnce) { savedOnce = true; toast('已存好，這則意見已經傳給我們了'); }
   }
   $('#btnAddText').onclick = () => { openEditor(); $('#edText').focus(); };
   $('#btnAddGeneral').onclick = () => { openEditor(null, true); $('#edText').focus(); };
@@ -1987,13 +1987,6 @@
       .join(' ').toLowerCase().includes(q));
     $('#count').textContent = notes.length ? `　${notes.length} 則，已完成 ${notes.filter(n => n.done).length}${shown.length !== notes.length ? `・顯示 ${shown.length}` : ''}` : '';
     $('#railCount').textContent = notes.length; $('#railCount').hidden = !notes.length;
-    if (api.mode === 'guest') {
-      const own = notes.filter(mine), unsent = own.filter(n => !n.submitted).length, b = $('#btnSubmit');
-      b.innerHTML = ic('share') + (unsent ? `送出 ${unsent} 則修改意見` : own.length ? '已全部送出' : '送出修改意見');
-      b.disabled = !unsent;
-      b.classList.toggle('primary', !!unsent);
-      b.title = unsent ? '看完了就按這裡，我們會收到通知' : notes.length ? '新增或修改意見後，可以再送出一次' : '先留下要修改的地方，再按送出';
-    }
     $('#list').innerHTML = shown.length ? shown.map(n => `
       <div class="note${n.done ? ' done' : ''}${n.general ? ' general' : ''}${n.id === activeId ? ' active' : ''}" data-id="${n.id}">
         <img src="${esc(n.thumb || '')}" data-act="seek" alt="">
@@ -2003,7 +1996,7 @@
             <span class="chip">#${notes.indexOf(n) + 1}</span>
             ${n.cat ? `<span class="chip">${esc(n.cat)}</span>` : ''}
             <span class="who">${avatar(n.by, isClient(n))}${esc(n.by || '')}${api.mode === 'owner' && n.group && n.group !== n.by ? `<span class="muted">・${esc(n.group)}</span>` : ''}</span>
-            ${server() && isClient(n) && !n.submitted && !n.carried ? `<span class="chip unsent" title="${api.mode === 'guest' ? '按上方「送出修改意見」後我們才會收到通知' : '客戶還沒按「送出」，可能還在看'}">未送出</span>` : ''}
+
           </div>
           ${n.carried && api.mode !== 'guest' ? `<div class="carried">從 ${esc(vlabel(n.carried))} 帶入・時間碼可能已隨剪接變動</div>` : ''}
           <div class="text"${mine(n) ? ' contenteditable="plaintext-only"' : ''} data-act="text">${esc(n.text)}</div>
@@ -2662,19 +2655,6 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     } catch (err) { toast(err.message); }
   });
 
-  // 送出: the client is done; the owner gets one notification with the count
-  $('#btnSubmit').onclick = async () => {
-    const unsent = notes.filter(n => mine(n) && !n.submitted).length;
-    if (queue.get().length) { toast(`還有 ${queue.get().length} 則意見在等網路上傳，連上網路後再送出。`); flushQueue(); return; }
-    if (!unsent || !confirm(`送出 ${unsent} 則修改意見？送出後我們會收到通知，之後還可以再補充。`)) return;
-    $('#btnSubmit').disabled = true;
-    try {
-      const r = await api.req('/submit', { method: 'POST' });
-      notes = r.notes.sort(byTime); project.info = r.info;
-      render(); renderStatus();
-      toast(`已送出 ${r.sent} 則意見，謝謝！我們會收到通知。`);
-    } catch (err) { toast(err.message); render(); }
-  };
   // a client's notes on earlier versions of this video: read-only, with whether each one was fixed
   function renderPrevious(prev) {
     const box = $('#prevNotes');
@@ -2691,13 +2671,13 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   // ---------- share links for outside reviewers (owner) ----------
   const shareUrl = token => `${location.origin}/s/#t=${token}`;
   const shareMessage = (label, token, expires, hasPin, due) =>
-    `【片語・審片】${videoName}\n${label ? label + ' ' : ''}您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，看完按「送出修改意見」。同事也可以用同一個連結，打開時填自己的名字就好：\n${shareUrl(token)}\n${due ? `麻煩在 ${dueText(due)}前回覆，謝謝！\n` : ''}（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
+    `【片語・審片】${videoName}\n${label ? label + ' ' : ''}您好，請點下面的連結觀看影片，看到要修改的地方可以直接用說的或打字留言，意見存了就會傳給我們，不用另外送出。同事也可以用同一個連結，打開時填自己的名字就好：\n${shareUrl(token)}\n${due ? `麻煩在 ${dueText(due)}前回覆，謝謝！\n` : ''}（之後的修改版本也用同一個連結；連結有效到 ${new Date(expires).toLocaleDateString('zh-TW')}${hasPin ? '；打開時需要輸入另外提供的 6 位數密碼' : ''}）`;
   // a short update for LINE: which version is up, and how many of their points from last time were fixed
   function notifyMessage(sh) {
     const p = sh.progress, url = shareUrl(sh.token), name = sh.label.replace(/（.*?）|\(.*?\)/g, '').trim(), hi = name ? name + ' 您好' : '您好';
-    const title = `「${p.current.title}」`, due = sh.due ? `\n麻煩在 ${dueText(sh.due)}前回覆，謝謝！` : '\n看完按「送出修改意見」或「核准」就可以，謝謝！';
+    const title = `「${p.current.title}」`, due = sh.due ? `\n麻煩在 ${dueText(sh.due)}前回覆，謝謝！` : '\n有要改的地方直接在影片上留言就可以，謝謝！';
     const late = sh.due && sh.due < new Date().toLocaleDateString('sv-SE');
-    if (late && !p.here.sent && p.status !== 'approved')
+    if (late && !p.here.total && p.status !== 'approved')
       return `${hi}，想跟您確認一下${title}${p.current.label ? ` ${p.current.label}` : ''}看過了嗎？\n連結：${url}\n有要修改的地方直接在影片上留言就可以，謝謝！`;
     if (p.prev) {
       const left = p.prev.total - p.prev.fixed;
@@ -2748,7 +2728,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const p = sh.progress, parts = [];
     if (p.current.label) parts.push(`目前連到 ${p.current.label}`);
     if (p.prev) parts.push(`上一版 ${p.prev.total} 點已修改 ${p.prev.fixed}`);
-    parts.push(p.here.total ? `這一版留了 ${p.here.total} 則${p.here.sent < p.here.total ? `（${p.here.total - p.here.sent} 則還沒送出）` : '，都送出了'}` : '這一版還沒留意見');
+    parts.push(p.here.total ? `這一版留了 ${p.here.total} 則` : '這一版還沒留意見');
     if (p.status === 'approved') parts.push('已核准');
     return parts.join('・');
   }
@@ -2762,7 +2742,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
         return `<div class="shareRow" data-id="${esc(sh.id)}" data-token="${esc(sh.token)}" data-label="${esc(sh.label)}" data-expires="${sh.expires}" data-pin="${sh.pin ? 1 : ''}">
           <strong>${esc(sh.label || '公開連結')}</strong>${sh.people?.length ? `<span class="small muted">（${esc(sh.people.join('、'))}）</span>` : !sh.label ? '<span class="small muted">（每個人自己填名字）</span>' : ''}${sh.madeFor && sh.madeFor !== videoName ? `<span class="small muted">（在 ${esc(sh.madeFor)} 分享，會自動開最新版）</span>` : ''}
           ${expired ? '<span class="chip fresh">已過期</span>' : `<span class="chip">到 ${new Date(sh.expires).toLocaleDateString('zh-TW')}</span>`}
-          ${sh.due ? `<span class="chip${sh.due < new Date().toLocaleDateString('sv-SE') && !sh.progress.here.sent && sh.progress.status !== 'approved' ? ' fresh' : ''}">回覆期限 ${dueText(sh.due)}</span>` : ''}
+          ${sh.due ? `<span class="chip${sh.due < new Date().toLocaleDateString('sv-SE') && !sh.progress.here.total && sh.progress.status !== 'approved' ? ' fresh' : ''}">回覆期限 ${dueText(sh.due)}</span>` : ''}
           ${sh.lockDevice ? '<span class="chip">限一台裝置</span>' : ''}${sh.pin ? `<span class="chip">密碼 ${esc(sh.pin)}</span>` : ''}
           <div>${sh.opens ? `打開 ${sh.opens} 次・最近 ${new Date(last.at).toLocaleString('zh-TW')}${last.place ? '・' + esc(last.place) : ''}・${esc(deviceOf(last.ua))}` : '對方還沒打開'}</div>
           <div>今天語音／AI：${sh.used}／${limit} 次</div>
@@ -2784,7 +2764,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       if (v === null) return;
       if (v.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) { toast('日期格式請用 2026-11-20'); return; }
       await api.req(`/shares/${encodeURIComponent(d.id)}`, { method: 'PATCH', json: { due: v.trim() || null } })
-        .then(() => toast(v.trim() ? '已設定回覆期限，快到期還沒送出時會提醒你' : '已取消期限')).catch(err => toast(err.message));
+        .then(() => toast(v.trim() ? '已設定回覆期限，快到期還沒留意見時會提醒你' : '已取消期限')).catch(err => toast(err.message));
       loadShares();
     }
     if (act === 'revoke' && confirm(`取消分享給「${d.label || '公開連結'}」？連結會立刻失效。`)) {
@@ -3042,7 +3022,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
       ['playCircle', '歡迎！', '這支影片分享給你審片。播放影片，看到想修改的地方就按暫停。'],
       ['mic', '用說的或打字', '按下方「語音意見」直接說，或按「文字意見」打字。點一下畫面，可以標出你說的位置。'],
       ['sparkle', '自動整理成清楚的說明', '你說的話會整理成清楚的修改說明，看一下沒問題就按「儲存」。'],
-      ['checkCircle', '看完了嗎？', '按「修改清單」上方的「送出修改意見」，我們就會收到通知；沒有要改的話，按「核准」。'],
+      ['checkCircle', '看完了嗎？', '意見存了就會傳給我們，不用另外送出；整支片沒問題的話，按「核准」。'],
     ],
   };
   let tour = { steps: [], i: 0 };

@@ -8,7 +8,7 @@ import { resolveShare, who, whoLabel } from '../../lib/share.js';
 import { saveImage, imageResponse, deleteImage, inShareFamily, spendImage } from '../../lib/images.js';
 import { dueOf } from '../../lib/ops.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply,
-  rememberNames, followLatest, earlierNotes, submitNotes } from '../../lib/core.js';
+  rememberNames, followLatest, earlierNotes, submitNotes, noteActivity } from '../../lib/core.js';
 
 const forGuest = notes => notes.map(({ decision, decisionNote, carried, origAuthor, ...n }) => n);
 
@@ -45,7 +45,11 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
 
   if (path === '/notes' && method === 'GET') return json({ notes: forGuest(await listNotes(d, share.video, me.author)) });
   if ((m = path.match(/^\/notes\/([\w-]+)$/))) {
-    if (method === 'PUT') { await putNote(d, share.video, m[1], await body(request), me); return json({ ok: true }); }
+    if (method === 'PUT') {
+      await putNote(d, share.video, m[1], await body(request), me);
+      waitUntil(noteActivity(d, env, share, me, share.video, m[1]).catch(err => console.error('note alert', err)));
+      return json({ ok: true });
+    }
     if (method === 'DELETE') { await deleteNote(d, share.video, m[1], me); return json({ ok: true }); }
   }
   if ((m = path.match(/^\/notes\/([\w-]+)\/replies$/)) && method === 'POST') {
