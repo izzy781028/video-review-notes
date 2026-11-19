@@ -64,7 +64,8 @@ function noteText(n, fps, start, showNew) {
   const who = isClient(n) ? `客戶：${n.by || '外部審片'}${n.group && n.group !== n.by ? `（${n.group}）` : ''}` : '你';
   const marks = [n.pt ? `畫面位置 x${Math.round(n.pt.x * 100)}% y${Math.round(n.pt.y * 100)}%` : '',
     n.shapes?.length ? '畫面上有' + [...new Set(n.shapes.map(s => SHAPES[s.type] || '標記'))].join('、') : ''].filter(Boolean).join('，');
-  const lines = [`- ${showNew && n.new ? '🆕 ' : ''}[${timecode(n, fps, start)}] ${who}${marks ? `（${marks}）` : ''}  id=${n.id}`,
+  const at = Date.parse(n.created) || n.updated, when = at ? new Date(at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const lines = [`- ${showNew && n.new ? '🆕 ' : ''}[${timecode(n, fps, start)}] ${who}${when ? `・${when}` : ''}${marks ? `（${marks}）` : ''}  id=${n.id}`,
     ...String(n.text || '').split('\n').map(l => '    ' + l)];
   if (n.raw && n.raw !== n.text) lines.push(`    （原始口述：${n.raw.replace(/\n/g, ' ')}）`);
   if (n.refs?.length) lines.push(`    （附了 ${n.refs.length} 張參考圖，用 get_note_images 看）`);

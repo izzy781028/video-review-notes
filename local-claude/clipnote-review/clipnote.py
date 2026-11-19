@@ -144,7 +144,13 @@ def print_note(n, fps, start, show_new=False):
     group = f"（{n['group']}）" if n.get('group') and n.get('group') != n.get('by') else ''
     who = f"客戶：{n.get('by') or '外部審片'}{group}" if is_client(n) else '你'
     cat = f"[{n['cat']}] " if n.get('cat') else ''  # older notes may still have a category
-    print(f"  - {mark}[{timecode(n, fps, start)}] {cat}{who}{pt}  id={n['id']}")
+    when = ''
+    try:
+        when = '・' + time.strftime('%m/%d %H:%M', time.localtime(__import__('datetime').datetime.fromisoformat(str(n['created']).replace('Z', '+00:00')).timestamp()))
+    except (KeyError, ValueError):
+        if n.get('updated'):
+            when = '・' + time.strftime('%m/%d %H:%M', time.localtime(n['updated'] / 1000))
+    print(f"  - {mark}[{timecode(n, fps, start)}] {cat}{who}{when}{pt}  id={n['id']}")
     for line in str(n.get('text', '')).splitlines():
         print(f'      {line}')
     if n.get('raw') and n['raw'] != n.get('text'):
