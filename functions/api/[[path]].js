@@ -2,7 +2,7 @@
 import { HttpError, json, handle, body, randomId } from '../../lib/http.js';
 import { db, getConfig, setKv, getKv, DEFAULT_CONFIG } from '../../lib/db.js';
 import { ownerEmail } from '../../lib/auth.js';
-import { folderId, listVideos, videoInFolder, streamVideo, canTrash, trashVideo, fileModified } from '../../lib/google.js';
+import { folderId, listVideos, videoInFolder, streamVideo, canTrash, trashVideo, fileModified, startUpload, uploadChunk, cancelUpload } from '../../lib/google.js';
 import { transcribe, polish, summarize } from '../../lib/ai.js';
 import { saveImage, imageResponse, deleteImage } from '../../lib/images.js';
 import { health, sawService, shareProgress, dueOf, setDue, dueAlerts, exportAll, orphans, cleanup } from '../../lib/ops.js';
@@ -21,6 +21,19 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   const d = await db(env);
   if (email === 'local-claude') waitUntil(sawService(d));
   let m;
+
+  // ---------- uploading a video into the review folder ----------
+  const kv = { get: (k, f) => getKv(d, k, f), set: (k, v) => setKv(d, k, v), del: k => d.prepare('DELETE FROM kv WHERE k = ?').bind(k).run() };
+  if (path === '/upload/start' && method === 'POST') return json(await startUpload(env, d, kv, await body(request)));
+  if ((m = path.match(/^\/upload\/(\w{32})$/))) {
+    if (method === 'GET') return json(await uploadChunk(kv, m[1], 0, null)); // where to carry on after a broken piece
+    if (method === 'DELETE') { await cancelUpload(kv, m[1]); return json({ ok: true }); }
+    if (method === 'PUT') {
+      const buf = await request.arrayBuffer(), start = Math.round(+url.searchParams.get('start'));
+      if (!buf.byteLength || buf.byteLength > 16 * 1024 * 1024 || !(start >= 0)) throw new HttpError(400, '上傳的片段不對');
+      return json(await uploadChunk(kv, m[1], start, buf));
+    }
+  }
 
   // ---------- 系統狀態, backup, cleanup ----------
   if (path === '/health' && method === 'GET') return json(await health(env, d, await getConfig(d)));
@@ -53,7 +66,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
       f.fresh = rows.filter(r => r.author !== 'owner' && r.updated > (seen[f.id] || 0)).length;
       f.status = status[f.id] || 'review';
     }
-    return json({ files, canDelete: canTrash(env) });
+    return json({ files, canDelete: canTrash(env), canUpload: canTrash(env) });
   }
 
   if ((m = path.match(/^\/videos\/([\w-]+)\/media$/))) {

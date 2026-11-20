@@ -354,6 +354,9 @@
   .dots { display: flex; justify-content: center; gap: 6px; margin: 10px 0; }
   .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
   .dots i.on { background: var(--accent); }
+  .upBar { height: 8px; border-radius: 99px; background: var(--glass-flat); border: 1px solid var(--glass-border); overflow: hidden; }
+  .upBar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  #upHint.warn { color: var(--warning); } #upHint.bad { color: var(--rec); }
   .hRow { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 8px; padding: 8px 0; border-top: 1px solid var(--line); }
   .hRow:first-child { border-top: 0; }
   .hRow .dot { grid-row: span 2; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; margin-top: 1px; }
@@ -467,6 +470,8 @@
         <div class="bar" style="margin-top:0">
           <strong class="iconLabel"><i data-ic="folder"></i>影片資料夾</strong>
           <span id="drivePath" class="small muted" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"></span>
+          <button id="btnUpload" class="small" hidden title="把影片傳進「片語審片」資料夾"><i data-ic="upload"></i>上傳影片</button>
+          <input id="upFile" type="file" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" hidden>
           <button id="driveRefresh" class="small iconBtn" title="重新整理" aria-label="重新整理"><i data-ic="refresh"></i></button>
         </div>
         <div id="driveList"></div>
@@ -707,6 +712,21 @@
   <div class="bar"><span class="spacer" style="flex:1"></span><button id="shClose">關閉</button></div>
 </dialog>
 
+<dialog id="upDlg">
+  <form id="upForm">
+    <h3 style="margin-top:0" class="iconLabel"><i data-ic="upload"></i>上傳影片</h3>
+    <div id="upInfo" class="small muted"></div>
+    <label>檔名（放進「片語審片」後的名字）</label>
+    <input id="upName" type="text" maxlength="200" required spellcheck="false">
+    <div id="upHint" class="small" style="margin-top:4px"></div>
+    <label id="upReplaceRow" style="font-weight:400" hidden><input type="checkbox" id="upReplace" style="width:auto"> 覆蓋同名的這支影片（內部審片：連結和意見都留在原處，之前的意見會標「上一輪」）</label>
+    <div id="upProgress" hidden style="margin-top:12px">
+      <div class="upBar"><span id="upBarFill"></span></div>
+      <div id="upStatus" class="small muted" style="margin-top:4px"></div>
+    </div>
+    <div class="bar"><span class="spacer" style="flex:1"></span><button type="button" id="upCancel">取消</button><button id="upGo" class="primary">開始上傳</button></div>
+  </form>
+</dialog>
 <dialog id="nameDlg">
   <form id="nameForm">
     <h3 style="margin-top:0">你的名字</h3>
@@ -1022,7 +1042,8 @@
     $('#drive').hidden = false; $('#drivePath').textContent = '最新的在最上面';
     list.innerHTML = '<div class="small muted">讀取中…</div>';
     try {
-      const { files, canDelete } = await api.req('/videos');
+      const { files, canDelete, canUpload } = await api.req('/videos');
+      folderFiles = files; $('#btnUpload').hidden = !canUpload;
       list.innerHTML = files.length ? files.map(f => `<div class="dRow"><button class="dItem" data-remote="${esc(f.id)}" data-name="${esc(f.name)}">
           <div class="th">${ic('play')}</div>
           <span><span class="nm">${esc(f.name)}</span><br><span class="sub">${[fmtDur(f.videoMediaMetadata?.durationMillis),
@@ -1089,6 +1110,87 @@
     if (b.dataset.remote) openRemote(b.dataset.remote, b.dataset.name);
     if (b.dataset.file) loadUrl(driveMediaUrl(b.dataset.file), b.dataset.name, 'vrn.notes.gdrive.' + b.dataset.file);
   });
+  // ---------- uploading into the review folder (owner; goes through the Drive helper) ----------
+  let folderFiles = [], upFile = null, upping = null;
+  const NAME_RULE = /^\d{8}_[^/\\]+_(v\d+|[A-Z][ _-]?copy|Final([ _-]?v?\d+)?)\.(mp4|mov|m4v)$/i;
+  const todayStamp = () => new Date().toLocaleDateString('sv-SE').replace(/-/g, '');
+  $('#btnUpload').onclick = () => $('#upFile').click();
+  $('#upFile').onchange = e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    upFile = f;
+    const ext = (f.name.match(/\.(mp4|mov|m4v)$/i) || ['.mp4'])[0];
+    let name = f.name.replace(/\.[^.]+$/, '') + ext;
+    if (!/^\d{8}_/.test(name)) name = todayStamp() + '_' + name; // the folder is sorted and versioned by this
+    $('#upName').value = name;
+    $('#upInfo').textContent = `${f.name}・${fmtSize(f.size)}`;
+    $('#upProgress').hidden = true; $('#upGo').disabled = false; $('#upName').disabled = false; $('#upReplace').checked = false;
+    checkUpName();
+    $('#upDlg').showModal();
+  };
+  function checkUpName() {
+    const name = $('#upName').value.trim(), hint = $('#upHint'), same = folderFiles.find(f => f.name === name);
+    $('#upReplaceRow').hidden = !same;
+    const notes = [];
+    let cls = '';
+    if (!/\.(mp4|mov|m4v)$/i.test(name)) { notes.push('檔名要是 .mp4、.mov 或 .m4v 結尾'); cls = 'bad'; }
+    else if (!NAME_RULE.test(name)) { notes.push('不符合命名規則（日期_專案_內容_版本，版本寫 A Copy／B Copy、Final 或 v2），片語會認不出版本，舊意見不會自動帶入'); cls = 'warn'; }
+    if (same) { notes.push(`資料夾已經有同名的影片（${same.notes || 0} 則意見）。給客戶的新版本請改用下一個版本號；內部審片可以勾下面「覆蓋」。`); cls ||= 'warn'; }
+    if (upFile && upFile.size > 1.5e9) { notes.push('檔案很大，建議先轉成 720p H.264 的 mp4，客戶播放會順很多'); cls ||= 'warn'; }
+    hint.textContent = notes.join('　'); hint.className = 'small ' + cls;
+    $('#upGo').disabled = cls === 'bad' || (same && !$('#upReplace').checked);
+  }
+  $('#upName').addEventListener('input', checkUpName);
+  $('#upReplace').onchange = checkUpName;
+  $('#upCancel').onclick = async () => {
+    if (upping) { if (!confirm('取消這次上傳？')) return; upping.cancel = true; return; }
+    $('#upDlg').close();
+  };
+  $('#upDlg').addEventListener('cancel', e => { if (upping) e.preventDefault(); });
+  window.addEventListener('beforeunload', e => { if (upping) { e.preventDefault(); e.returnValue = ''; } });
+  $('#upForm').onsubmit = async e => {
+    e.preventDefault();
+    if (!upFile || upping) return;
+    const name = $('#upName').value.trim(), same = folderFiles.find(f => f.name === name);
+    const job = upping = { cancel: false };
+    $('#upGo').disabled = true; $('#upName').disabled = true; $('#upProgress').hidden = false;
+    const show = (sent, msg) => { $('#upBarFill').style.width = (sent / upFile.size * 100).toFixed(1) + '%';
+      $('#upStatus').textContent = msg || `${fmtSize(sent)} / ${fmtSize(upFile.size)}（${Math.floor(sent / upFile.size * 100)}%）・上傳中請不要關掉這個頁面`; };
+    let uid = null;
+    try {
+      show(0, '準備中…');
+      const start = await api.req('/upload/start', { method: 'POST', json: { name, size: upFile.size, mime: upFile.type, replace: same && $('#upReplace').checked ? same.id : null } });
+      uid = start.uid;
+      let at = 0, done = null, fails = 0;
+      while (!done) {
+        if (job.cancel) throw Object.assign(new Error('已取消上傳'), { cancelled: true });
+        const piece = upFile.slice(at, Math.min(upFile.size, at + start.chunk));
+        try {
+          const r = await api.req(`/upload/${uid}?start=${at}`, { method: 'PUT', body: piece, headers: { 'content-type': 'application/octet-stream' } });
+          if (r.done) done = r; else at = r.next; fails = 0;
+        } catch (err) {
+          if (err.status && err.status < 500 && err.status !== 429) throw err;
+          if (++fails > 6) throw new Error('網路一直斷線，上傳停止了：' + err.message);
+          show(at, `連線不穩，${fails * 3} 秒後重試…`);
+          await new Promise(r => setTimeout(r, fails * 3000));
+          const st = await api.req(`/upload/${uid}`).catch(() => null); // ask Drive how much it has
+          if (st?.done) done = st; else if (st) at = st.next;
+        }
+        show(done ? upFile.size : at);
+      }
+      upping = null;
+      $('#upDlg').close();
+      toast(done.replaced ? `已覆蓋「${done.file.name}」，連結和意見都留在原處` : `已上傳「${done.file.name}」`);
+      listServerVideos();
+    } catch (err) {
+      upping = null;
+      if (uid) api.req(`/upload/${uid}`, { method: 'DELETE' }).catch(() => {});
+      $('#upName').disabled = false; checkUpName();
+      show(0, err.cancelled ? '已取消。' : '上傳失敗：' + err.message);
+      if (err.cancelled) $('#upDlg').close();
+    }
+  };
+
   async function trashRemote(b) {
     const { del: id, name } = b.dataset, notes = +b.dataset.notes || 0;
     if (!confirm(`把「${name}」移到 Google Drive 垃圾桶？\n\n・30 天內可以從 Drive 垃圾桶救回\n・${notes ? `${notes} 則意見會保留在片語裡` : '這支片沒有意見'}\n・這支片的分享連結會打不開`)) return;
