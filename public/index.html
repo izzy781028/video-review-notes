@@ -198,7 +198,7 @@
   #editor img { width: 160px; border-radius: 12px; flex: none; background: #000; }
   #editor img[src=""], .note img[src=""] { visibility: hidden; }
   .note.general { border-style: dashed; }
-  #editor textarea { width: 100%; min-height: 96px; padding: 10px 12px; resize: vertical; margin-top: 6px; }
+  #editor textarea { width: 100%; min-height: 140px; padding: 10px 12px; resize: vertical; margin-top: 6px; line-height: 1.6; overflow-y: auto; }
   #recStatus { min-height: 1.5em; }
   #list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 140px); overflow: auto; }
   .note { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; padding: 10px 12px; border-radius: 18px;
@@ -411,7 +411,7 @@
     body.typing #editor .row { flex-direction: row; align-items: flex-start; gap: 10px; }
     body.typing #editor img[src^="data:"] { display: block; width: 84px; flex: none; border-radius: 10px; }
     body.typing #toolsRow { display: none; }
-    body.typing #editor textarea { min-height: 120px; }
+    body.typing #editor textarea { min-height: 160px; }
     #list { max-height: none; overflow: visible; }
     #editor .row { flex-direction: column; }
     #editor img { width: 50%; }
@@ -1692,7 +1692,7 @@
     if (!narrow.matches || !typingField(e.target)) return;
     clearTimeout(typingOff);
     if (document.body.classList.contains('typing')) return;
-    document.body.classList.add('typing'); updatePin();
+    document.body.classList.add('typing'); updatePin(); fitEdText();
     // once the keyboard is up, bring the text box to the middle of what is still visible (no animation: it can cut off the input method)
     setTimeout(() => { if (document.activeElement === e.target) e.target.scrollIntoView({ block: 'center' }); }, 350);
   });
@@ -1767,15 +1767,28 @@
     }
     $('#edGeneral').checked = general || !!editing.general;
     syncGeneral();
-    $('#edText').value = editing.text;
+    setEdText(editing.text);
     $('#recStatus').textContent = '';
     $('#btnRaw').hidden = !editing.raw;
     refEdit = { added: new Set(), removed: new Set() }; renderEdRefs();
     $('#editor').classList.add('open');
     document.body.classList.add('editing');
+    fitEdText();
     if (matchMedia('(max-width: 700px)').matches) setTimeout(() => { if (!typingField(document.activeElement)) $('#stageSpacer').scrollIntoView({ behavior: 'smooth', block: 'start' }); refreshPt(); }, 50);
     else setTimeout(() => { $('#editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); refreshPt(); }, 50);
   }
+  // the note box grows with what is written, so long notes are read and edited without scrolling inside a small box;
+  // past most of the screen it scrolls on its own (on a phone: the part the keyboard leaves free)
+  function fitEdText() {
+    const ta = $('#edText'), vh = window.visualViewport?.height || innerHeight;
+    if (!ta.offsetParent) { ta.style.height = ''; return; } // the editor is still closed: measured once it opens
+    const max = Math.max(160, Math.round(document.body.classList.contains('typing') ? vh * 0.55 : vh * 0.6));
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight + 2, max) + 'px';
+  }
+  function setEdText(v) { $('#edText').value = v; fitEdText(); }
+  $('#edText').addEventListener('input', fitEdText);
+  window.visualViewport?.addEventListener('resize', () => { if (editing) fitEdText(); });
   function syncGeneral() {
     const g = $('#edGeneral').checked;
     $('#edTc').textContent = g ? '整體意見（全片）' : tcOfFrame(editing.frame ?? frameOf(video.currentTime));
@@ -1991,7 +2004,7 @@
           const r = e.results[i];
           if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
         }
-        $('#edText').value = this.base + tw(finalText + interim);
+        setEdText(this.base + tw(finalText + interim));
       };
       sr.onerror = e => status('辨識錯誤：' + e.error);
       sr.onend = () => { if (this.active) { this.active = false; recUi(false); status('辨識完成，可以直接修改文字再儲存。'); $('#edText').focus(); afterSpeech(); } };
@@ -2051,7 +2064,7 @@
       }
       text = tw((text || '').trim());
       if (editing !== target) return;
-      $('#edText').value = rec.base + text;
+      setEdText(rec.base + text);
       status('辨識完成，可以直接修改文字再儲存。');
       $('#edText').focus();
       afterSpeech();
@@ -2118,7 +2131,7 @@
       out = tw(out.replace(/[ \t]*【待確認[^】]*】/g, '').trim()); // no 【待確認…】 notes
       if (!out) throw new Error('沒有回傳內容');
       if (editing !== target) return;
-      $('#edText').value = lastPolished = out;
+      setEdText(lastPolished = out);
       $('#btnRaw').hidden = false;
       status('已潤飾。可以再手動調整；按「原始口述」可換回原話。');
       $('#edText').focus();
@@ -2127,7 +2140,7 @@
     } finally { btn.disabled = false; }
   }
   $('#btnPolish').onclick = polish;
-  $('#btnRaw').onclick = () => { if (editing?.raw) { $('#edText').value = editing.raw; status('已換回原始口述。'); } };
+  $('#btnRaw').onclick = () => { if (editing?.raw) { setEdText(editing.raw); status('已換回原始口述。'); } };
 
   // ---------- list ----------
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
