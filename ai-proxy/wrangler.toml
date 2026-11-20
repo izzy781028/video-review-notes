@@ -9,5 +9,12 @@ workers_dev = true
 preview_urls = false
 keep_vars = true  # keep variables added in the dashboard
 
+# every 5 minutes: ask 片語 to mail the digest of client notes that have gone quiet
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+CLIPNOTE_URL = "https://clipnote-d9t.pages.dev"
+
 [placement]
 region = "aws:us-east-1"

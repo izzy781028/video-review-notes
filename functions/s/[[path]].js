@@ -1,14 +1,14 @@
 // Share links for outside reviewers: /s/#t=<token> serves the app in guest mode, /s/api/* is its API.
 // Cloudflare Access is bypassed for /s; the share token (plus optional PIN / device lock) is the gate.
 import { HttpError, json, handle, body } from '../../lib/http.js';
-import { getConfig } from '../../lib/db.js';
+import { db, getConfig } from '../../lib/db.js';
 import { videoInFolder, streamVideo, listVideos, fileModified } from '../../lib/google.js';
 import { transcribe, polish } from '../../lib/ai.js';
 import { resolveShare, who, whoLabel } from '../../lib/share.js';
 import { saveImage, imageResponse, deleteImage, inShareFamily, spendImage } from '../../lib/images.js';
 import { dueOf } from '../../lib/ops.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, notify, spend, dailyLimit, usedToday, addReply, deleteReply,
-  rememberNames, followLatest, earlierNotes, submitNotes, noteActivity } from '../../lib/core.js';
+  rememberNames, followLatest, earlierNotes, submitNotes, noteActivity, sendDigests } from '../../lib/core.js';
 
 const forGuest = notes => notes.map(({ decision, decisionNote, carried, origAuthor, ...n }) => n);
 
@@ -19,6 +19,8 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
   const opening = path === '/info';
   const { share, d, setCookies } = await resolveShare(request, env, url, { opening });
   const me = who(share, request);
+  // earlier bursts that have gone quiet (on the page's periodic sync, not on every video range request)
+  if (method === 'GET' && (path === '/notes' || path === '/info')) waitUntil(sendDigests(d, env).catch(err => console.error('digest', err)));
   const withCookies = res => { setCookies.forEach(c => res.headers.append('set-cookie', c)); return res; };
   let m;
 
@@ -48,7 +50,7 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
   if ((m = path.match(/^\/notes\/([\w-]+)$/))) {
     if (method === 'PUT') {
       await putNote(d, share.video, m[1], await body(request), me);
-      if (!share.internal) waitUntil(noteActivity(d, env, share, me, share.video, m[1]).catch(err => console.error('note alert', err)));
+      if (!share.internal) waitUntil(noteActivity(d, env, share, me, share.video, m[1], url.origin).catch(err => console.error('note alert', err)));
       return json({ ok: true });
     }
     if (method === 'DELETE') { await deleteNote(d, share.video, m[1], me); return json({ ok: true }); }
@@ -96,8 +98,17 @@ const api = handle(async ({ request, env, params, waitUntil }) => {
   throw new HttpError(404, '找不到這個功能');
 });
 
+// the clipnote-ai Worker's schedule calls this every few minutes (same secret as the AI relay)
+const same = (a, b) => { if (!a || !b || a.length !== b.length) return false; let x = 0; for (let i = 0; i < a.length; i++) x |= a.charCodeAt(i) ^ b.charCodeAt(i); return x === 0; };
+async function digestHook({ request, env }) {
+  if (request.method !== 'POST' || !same(request.headers.get('x-clipnote-proxy') || '', env.AI_PROXY_TOKEN || '')) return json({ error: 'forbidden' }, 403);
+  await sendDigests(await db(env), env);
+  return json({ ok: true });
+}
+
 export async function onRequest(context) {
   const segs = [].concat(context.params.path || []);
+  if (segs[0] === 'hook' && segs[1] === 'digest') return digestHook(context);
   if (segs[0] === 'api') return api(context);
   // icons and the manifest are referenced relatively, so /s/icons/... must serve the real files
   if (segs[0] === 'icons' || segs[0] === 'manifest.webmanifest')

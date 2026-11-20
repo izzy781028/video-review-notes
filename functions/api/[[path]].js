@@ -7,7 +7,7 @@ import { transcribe, polish, summarize } from '../../lib/ai.js';
 import { saveImage, imageResponse, deleteImage } from '../../lib/images.js';
 import { health, sawService, shareProgress, dueOf, setDue, dueAlerts, exportAll, orphans, cleanup } from '../../lib/ops.js';
 import { listNotes, putNote, deleteNote, getVideo, patchVideo, STATUSES, usedToday, addAllowance, dailyLimit,
-  cleanLimit, addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf, followLatest } from '../../lib/core.js';
+  cleanLimit, sendDigests, addReply, deleteReply, rememberNames, previousVersions, carryNotes, versionOf, followLatest } from '../../lib/core.js';
 
 const OWNER = { author: 'owner' };
 
@@ -218,6 +218,7 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
   // ---------- notifications ----------
   if (path === '/alerts' && method === 'GET') {
     await dueAlerts(d, env).catch(err => console.error('due alerts', err));
+    waitUntil(sendDigests(d, env).catch(err => console.error('digest', err)));
     const { results } = await d.prepare('SELECT id, at, kind, share, text FROM alerts WHERE seen = 0 ORDER BY at DESC LIMIT 20').all();
     return json({ alerts: results });
   }

@@ -11,6 +11,11 @@ const same = (a, b) => {
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 
 export default {
+  async scheduled(event, env, ctx) {
+    if (!env.CLIPNOTE_URL || !env.PROXY_TOKEN) return;
+    ctx.waitUntil(fetch(env.CLIPNOTE_URL.replace(/\/+$/, '') + '/s/hook/digest', { method: 'POST', headers: { 'x-clipnote-proxy': env.PROXY_TOKEN } })
+      .then(r => { if (!r.ok) console.error('digest hook', r.status); }));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!env.PROXY_TOKEN) return json({ error: 'forbidden', why: 'PROXY_TOKEN 尚未設定（Worker → Settings → Variables and Secrets）' }, 403);

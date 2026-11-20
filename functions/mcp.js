@@ -6,13 +6,12 @@ import { onRequest as ownerApi } from './api/[[path]].js';
 import { db, getKv, setKv } from '../lib/db.js';
 import { ownerEmail } from '../lib/auth.js';
 import { HttpError } from '../lib/http.js';
+import { timecode } from '../lib/timecode.js';
 
 const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const STATUS = { review: '待審', changes: '需要修改', approved: '已核准' };
 const DECISION = { accept: '照改', adjust: '改法調整', reject: '不改' };
 const SHAPES = { arrow: '箭頭', box: '方框', pen: '手繪線' };
-const FPS = { '23.976': [24000 / 1001, 24], '24': [24, 24], '25': [25, 25], '29.97': [30000 / 1001, 30], '30': [30, 30],
-  '50': [50, 50], '59.94': [60000 / 1001, 60], '60': [60, 60] };
 
 const INSTRUCTIONS = `片語（Clipnote）是阿湯的線上審片工具：阿湯和客戶在影片上留時間碼意見，這些工具讓你讀意見、看截圖和參考圖、記錄處理結果。
 - 意見分兩種：「你」（阿湯自己）的意見直接照做；「客戶」的意見要逐則問使用者：照改、改法調整（問怎麼改）或不改，再用 record_decision 記下。不要自己替客戶意見做決定。
@@ -48,17 +47,6 @@ const TOOLS = [
 ];
 
 // ---------- helpers ----------
-function timecode(n, fps = '29.97', start = '00:00:00:00') {
-  if (n.general) return '整體意見';
-  const [rate, tb] = FPS[fps] || FPS['29.97'];
-  const m = String(start).match(/^(\d+):(\d+):(\d+)[:;](\d+)$/);
-  const offset = m ? ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * tb + +m[4] : 0;
-  const tc = (frame, t) => {
-    const f = (frame ?? Math.floor((t || 0) * rate + 1e-4)) + offset, p = x => String(x).padStart(2, '0');
-    return `${p(Math.floor(f / (tb * 3600)))}:${p(Math.floor(f / (tb * 60)) % 60)}:${p(Math.floor(f / tb) % 60)}:${p(f % tb)}`;
-  };
-  return tc(n.frame, n.t) + (n.frame2 != null || n.t2 != null ? ' → ' + tc(n.frame2, n.t2) : '');
-}
 const isClient = n => String(n.origAuthor || n.author || 'owner').startsWith('share:');
 function noteText(n, fps, start, showNew) {
   const who = isClient(n) ? `客戶：${n.by || '外部審片'}${n.group && n.group !== n.by ? `（${n.group}）` : ''}` : '你';
