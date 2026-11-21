@@ -23,17 +23,19 @@ DECISION = {'accept': '照改', 'adjust': '改法調整', 'reject': '不改'}
 FPS = {'23.976': (24000 / 1001, 24), '24': (24, 24), '25': (25, 25), '29.97': (30000 / 1001, 30),
        '30': (30, 30), '50': (50, 50), '59.94': (60000 / 1001, 60), '60': (60, 60)}
 # …_A Copy, …_B Copy … then …_Final (…_Final_v2), or …_v1, …_v2 (same version rule as the app)
-NAME_RULE = re.compile(r'^\d{8}_[^/\\]+_(v\d+|[A-Z][ _-]?copy|Final([ _-]?v?\d+)?)\.(mp4|mov|m4v)$', re.I)
+NAME_RULE = re.compile(r'^\d{8}_[^/\\]+_(v\d+|[A-Z][ _-]?copy|Final([ _-]?v?\d+)?)([ _-]?內部)?\.(mp4|mov|m4v)$', re.I)
 
 
 def next_version(name):
     stem = re.sub(r'\.\w+$', '', name)
+    if tag := re.search(r'([ _-]?內部)$', stem):  # internal series: …_V2_內部 → …_V3_內部
+        return next_version(stem[:tag.start()] + '.mp4').replace('（定剪就用 _Final）', '') + tag[1]
     if m := re.search(r'_Final(?:[ _-]?v?(\d+))?$', stem, re.I):  # before _v: "Final_v2" is a Final
         return f'_Final_v{int(m[1] or 1) + 1}'
     if m := re.search(r'_([A-Z])([ _-]?)(copy)$', stem, re.I):  # keep the user's style: "_B Copy", "_Bcopy"…
         return f'_{chr(ord(m[1].upper()) + 1)}{m[2]}{m[3]}（定剪就用 _Final）'
-    if m := re.search(r'_v(\d+)$', stem, re.I):
-        return f'_v{int(m[1]) + 1}'
+    if m := re.search(r'_([vV])(\d+)$', stem):  # keep the user's V / v
+        return f'_{m[1]}{int(m[2]) + 1}'
     return '下一個版本'
 
 
