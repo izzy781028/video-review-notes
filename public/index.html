@@ -710,6 +710,7 @@
     <label style="font-weight:400"><input type="checkbox" id="shPin" style="width:auto"> 另外加 6 位數密碼（機密案子：連結和密碼分開傳）</label>
     <label>每天語音／AI 次數（選填）<input id="shLimit" type="number" min="1" max="1000" step="1" inputmode="numeric" style="width:120px; margin-left:8px"></label>
     <label style="font-weight:400"><input type="checkbox" id="shInternal" style="width:auto"> 內部審片：同事看得到所有人的意見（含你的），留意見不會通知你</label>
+    <div id="shInternalOnly" class="small muted" hidden>這是內部版本（檔名有「內部」），只能分享給內部同事。</div>
     <div class="bar"><button class="primary">產生分享連結</button></div>
   </form>
   <div id="shareResult" hidden>
@@ -2890,6 +2891,9 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     $('#shareVideo').textContent = videoName;
     $('#shareResult').hidden = true; $('#shareForm').reset();
     $('#shDue').min = new Date().toLocaleDateString('sv-SE');
+    // an internal cut (…_內部) can only be shared internally
+    const internalCut = !!versionOf(videoName)?.internal;
+    $('#shInternal').checked = internalCut; $('#shInternal').disabled = internalCut; $('#shInternalOnly').hidden = !internalCut;
     $('#shLimit').placeholder = `預設 ${api.limit || 50}`;
     $('#shareDlg').showModal(); loadShares();
   };

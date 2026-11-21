@@ -205,7 +205,8 @@ export const onRequest = handle(async ({ request, env, params, waitUntil }) => {
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(share.id, share.token, video, meta.name, label, share.pin, share.lock, share.created, share.expires).run();
       if (input.due) await setDue(d, share.id, String(input.due));
-      if (input.internal) await setKv(d, 'shareinternal:' + share.id, true);
+      // a file named …_內部 is an internal cut: its links are always internal, whatever the form said
+      if (input.internal || versionOf(meta.name)?.internal) await setKv(d, 'shareinternal:' + share.id, true);
       if (cleanLimit(input.limit)) await setKv(d, 'sharelimit:' + share.id, cleanLimit(input.limit));
       return json({ id: share.id, token: share.token, pin: share.pin, expires: share.expires });
     }
