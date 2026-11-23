@@ -364,6 +364,8 @@
     background: rgba(29,27,46,.88); color: #fff; padding: 10px 16px; border-radius: 14px; font-size: 13px; max-width: calc(100vw - 32px); display: none;
     -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: var(--shadow-soft); }
   #toast.show { display: block; }
+  /* shown as a popover so it sits above an open dialog and its blurred backdrop */
+  #toast[popover] { margin: 0; inset: auto auto calc(96px + env(safe-area-inset-bottom)) 50%; border: 0; overflow: visible; }
   /* guest gate, tour, share dialog */
   #gate { max-width: 420px; margin: 12vh auto; text-align: center; }
   #gate input { font-size: 24px; letter-spacing: 8px; text-align: center; width: 200px; padding: 8px; }
@@ -815,7 +817,7 @@
   </div>
 </dialog>
 
-<div id="toast"></div>
+<div id="toast" popover="manual" role="status" aria-live="polite"></div>
 <div id="printView"></div>
 
 <script>
@@ -975,7 +977,9 @@
   let toastTimer;
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+    // re-open so it comes above whatever dialog opened since (the newest top-layer element is drawn last)
+    if (t.showPopover) { try { if (t.matches(':popover-open')) t.hidePopover(); t.showPopover(); } catch {} }
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.classList.remove('show'); try { t.hidePopover?.(); } catch {} }, 3500);
   }
 
   // ---------- timecode ----------
