@@ -2497,30 +2497,54 @@
     const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('無法載入 ' + src));
     document.head.appendChild(s);
   });
+  // Seek to a frame and wait until that frame is really on screen. A video streamed from Drive can take several
+  // seconds per seek, and 'seeked' can come before the new picture is decoded; a frame that never arrives is reported
+  // so the export falls back to the note's own thumbnail instead of repeating whatever was on screen.
   function waitSeek(f) {
+    const target = Math.max(0, (f + 0.5) / fpsInfo()[0]);
     return new Promise(res => {
       let done = false;
-      const fin = () => { if (done) return; done = true; video.removeEventListener('seeked', fin); requestAnimationFrame(() => res()); };
-      video.addEventListener('seeked', fin); setTimeout(fin, 2000);
-      seekFrame(f);
+      const fin = ok => { if (done) return; done = true; clearTimeout(timer); video.removeEventListener('seeked', onSeeked); res(ok); };
+      const painted = () => new Promise(r => {
+        if (video.requestVideoFrameCallback) { const t = setTimeout(r, 1500); video.requestVideoFrameCallback(() => { clearTimeout(t); r(); }); }
+        else requestAnimationFrame(() => requestAnimationFrame(r));
+      });
+      const onSeeked = async () => {
+        await painted();
+        fin(video.readyState >= 2 && Math.abs(video.currentTime - target) < 1.5 / fpsInfo()[0] + 0.05);
+      };
+      const timer = setTimeout(() => fin(false), 20000);
+      video.addEventListener('seeked', onSeeked);
+      video.currentTime = target;
     });
   }
+  const dataUrlSize = url => new Promise(res => { const im = new Image(); im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => res(null); im.src = url; });
   // re-grab each timed note at full resolution (the stored thumbnails are small to keep storage light)
   async function captureFrames(btn) {
     const label0 = btn.innerHTML, back = video.currentTime, out = {};
     video.pause();
     const timed = timedNotes();
+    let missed = 0;
     for (let i = 0; i < timed.length; i++) {
+      const n = timed[i];
       btn.textContent = `擷取畫面 ${i + 1}/${timed.length}…`;
-      await waitSeek(timed[i].frame);
+      let ok = await waitSeek(n.frame);
+      if (!ok) { btn.textContent = `擷取畫面 ${i + 1}/${timed.length}（重試）…`; ok = await waitSeek(n.frame); }
+      if (!ok) { // fall back to the small picture saved with the note
+        missed++;
+        const size = n.thumb && await dataUrlSize(n.thumb);
+        if (size) out[n.id] = { url: n.thumb, ...size };
+        continue;
+      }
       const vw = video.videoWidth || 1280, vh = video.videoHeight || 720, k = Math.min(1, 1280 / Math.max(vw, vh));
       const c = document.createElement('canvas');
       c.width = Math.round(vw * k); c.height = Math.round(vh * k);
       c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
-      drawMarksOn(c.getContext('2d'), c.width, c.height, timed[i]);
-      try { out[timed[i].id] = { url: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height }; } catch { break; } // cross-origin video: no screenshots
+      drawMarksOn(c.getContext('2d'), c.width, c.height, n);
+      try { out[n.id] = { url: c.toDataURL('image/jpeg', 0.85), w: c.width, h: c.height }; } catch { break; } // cross-origin video: no screenshots
     }
     video.currentTime = back; btn.innerHTML = label0;
+    if (missed) toast(`有 ${missed} 個畫面讀取太慢，改用留意見時存的小截圖`);
     return out;
   }
   async function refImages() {
