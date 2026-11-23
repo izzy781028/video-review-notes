@@ -3072,7 +3072,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const bar = $('#verBar'), prev = versions?.previous?.[0];
     bar.hidden = !prev;
     if (!prev) return;
-    bar.innerHTML = `<span class="iconLabel">${ic('layers')}<span>這是 <b>${esc(vlabel(versions.current))}</b>。上一版 ${esc(vlabel(prev))}
+    bar.innerHTML = `<span class="iconLabel" title="上一版的檔案：${esc(prev.name)}${prev.inFolder ? '' : '（已不在審片資料夾）'}">${ic('layers')}<span>這是 <b>${esc(vlabel(versions.current))}</b>。上一版 ${esc(vlabel(prev))}${prev.inFolder ? '' : '<span class="small muted">（已移走的檔案）</span>'}
         ${prev.open ? `還有 <b>${prev.open}</b> 則沒完成` : '的意見都處理完了'}${prev.carried ? `，已帶入 ${prev.carried} 則` : ''}。</span></span>
       <span class="spacer" style="flex:1"></span>
       ${prev.remaining ? `<button class="small primary" data-carry="${esc(prev.id)}">把 ${prev.remaining} 則帶到這一版</button>` : ''}
