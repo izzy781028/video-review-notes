@@ -300,6 +300,8 @@
   body.picking .dDel { display: none; }
   .dRow.picked .dItem { outline: 2px solid var(--accent); outline-offset: -2px; }
   .dRow.picked .dCheck { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #snapCanvas { display: block; max-width: 100%; max-height: 55vh; margin: 0 auto; border-radius: 12px; background: #000; touch-action: none; cursor: crosshair; }
+  #snapTools button { padding: 4px 10px; }
   #pickBar { position: sticky; bottom: 0; z-index: 2; margin-top: 8px; padding: 8px 10px; border-radius: 16px; background: var(--sheet-bg); border: 1px solid var(--glass-border); box-shadow: var(--shadow); }
   #pickBar .danger { background: var(--rec); color: #fff; border-color: transparent; }
   .dRow .dItem { padding-right: 48px; }
@@ -732,8 +734,18 @@
 
 <dialog id="snapDlg">
   <h3 style="margin-top:0" class="iconLabel"><i data-ic="camera"></i>截圖</h3>
-  <img id="snapImg" alt="目前這一格" style="display:block; width:100%; max-height:55vh; object-fit:contain; border-radius:12px; background:#000">
+  <div class="bar" style="margin:0 0 8px">
+    <span class="seg" id="snapTools" title="在截圖上標出位置">
+      <button data-stool="arrow" class="on"><i data-ic="arrow"></i>箭頭</button>
+      <button data-stool="box"><i data-ic="box"></i>方框</button>
+      <button data-stool="pen"><i data-ic="pen"></i>手繪</button>
+      <button data-stool="pt"><i data-ic="target"></i>圈選</button>
+    </span>
+    <button id="snapUndo" class="ghost small"><i data-ic="undo"></i>復原</button>
+  </div>
+  <canvas id="snapCanvas" aria-label="截圖，可以在上面畫標記"></canvas>
   <div id="snapInfo" class="small muted" style="margin-top:6px"></div>
+  <div class="small muted">在畫面上拖曳畫箭頭或方框；畫的標記會一起存進圖片。</div>
   <div class="bar"><button id="snapClose">關閉</button><span class="spacer" style="flex:1"></span>
     <button id="snapCopy"><i data-ic="copy"></i>複製（貼到 LINE）</button>
     <button id="snapSave" class="primary"><i data-ic="download"></i><span>下載</span></button></div>
@@ -1139,33 +1151,74 @@
     if (b.dataset.remote) openRemote(b.dataset.remote, b.dataset.name);
     if (b.dataset.file) loadUrl(driveMediaUrl(b.dataset.file), b.dataset.name, 'vrn.notes.gdrive.' + b.dataset.file);
   });
-  // ---------- 截圖: the current frame at full resolution, to download, copy or share ----------
-  let snap = null;
+  // ---------- 截圖: the current frame at full resolution, with optional marks, to download, copy or share ----------
+  let snap = null, snapTool = 'arrow', snapDrag = null;
   async function snapshot() {
     if (!video.src || !video.videoWidth) { toast('影片還沒載入'); return; }
     video.pause(); stopShuttle();
-    const c = document.createElement('canvas');
-    c.width = video.videoWidth; c.height = video.videoHeight;
-    c.getContext('2d').drawImage(video, 0, 0);
+    const frame = document.createElement('canvas');
+    frame.width = video.videoWidth; frame.height = video.videoHeight;
+    frame.getContext('2d').drawImage(video, 0, 0);
+    try { frame.getContext('2d').getImageData(0, 0, 1, 1); } catch { toast('這個影片來源不允許截圖'); return; } // a video from another site without CORS
     const tc = tcOf(video.currentTime);
-    let jpg;
-    try { jpg = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(), 'image/jpeg', 0.92)); }
-    catch { toast('這個影片來源不允許截圖'); return; } // a video from another site without CORS
-    if (snap?.url) URL.revokeObjectURL(snap.url);
-    snap = { canvas: c, jpg, url: URL.createObjectURL(jpg), name: `${videoName.replace(/\.[^.]+$/, '') || '影片'}_${tc.replace(/[:;]/g, '-')}.jpg`, tc };
-    $('#snapImg').src = snap.url;
-    $('#snapInfo').textContent = `${tc}・${c.width}×${c.height}`;
+    snap = { frame, shapes: [], pt: null, name: `${videoName.replace(/\.[^.]+$/, '') || '影片'}_${tc.replace(/[:;]/g, '-')}.jpg`, tc };
+    const c = $('#snapCanvas'); c.width = frame.width; c.height = frame.height;
+    drawSnap();
+    $('#snapInfo').textContent = `${tc}・${frame.width}×${frame.height}`;
     // on a phone 下載 opens the share sheet (save to Photos, LINE…), like the other exports
     $('#snapSave').lastElementChild.textContent = matchMedia('(pointer: coarse)').matches ? '存到手機／分享' : '下載';
     $('#snapCopy').hidden = !(navigator.clipboard?.write && window.ClipboardItem);
     $('#snapDlg').showModal();
   }
+  // the frame plus whatever has been drawn on it (same red marks as on notes)
+  function drawSnap() {
+    const c = $('#snapCanvas'), g = c.getContext('2d');
+    g.drawImage(snap.frame, 0, 0);
+    drawMarksOn(g, c.width, c.height, { pt: snap.pt, shapes: snapDrag ? [...snap.shapes, snapDrag] : snap.shapes }, 1.8); // seen small in a chat: bolder
+    $('#snapUndo').disabled = !snap.shapes.length && !snap.pt;
+  }
+  const snapAt = e => { const r = $('#snapCanvas').getBoundingClientRect(); return [clamp01((e.clientX - r.left) / r.width), clamp01((e.clientY - r.top) / r.height)]; };
+  $('#snapTools').onclick = e => {
+    const b = e.target.closest('[data-stool]'); if (!b) return;
+    snapTool = b.dataset.stool;
+    $('#snapTools').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  };
+  $('#snapCanvas').addEventListener('pointerdown', e => {
+    if (!snap) return;
+    e.preventDefault();
+    const p = snapAt(e);
+    if (snapTool === 'pt') { snap.pt = { x: p[0], y: p[1] }; snap.order = [...(snap.order || []), 'pt']; drawSnap(); return; }
+    $('#snapCanvas').setPointerCapture(e.pointerId);
+    snapDrag = { type: snapTool, pts: [p] };
+    if (snapTool !== 'pen') snapDrag.pts.push(p.slice());
+  });
+  $('#snapCanvas').addEventListener('pointermove', e => {
+    if (!snapDrag) return;
+    const p = snapAt(e), last = snapDrag.pts.at(-1);
+    if (snapDrag.type !== 'pen') snapDrag.pts[1] = p;
+    else if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 0.004 && snapDrag.pts.length < 600) snapDrag.pts.push(p);
+    drawSnap();
+  });
+  const endSnapDrag = () => {
+    if (!snapDrag) return;
+    const sh = snapDrag, a = sh.pts[0], b = sh.pts.at(-1);
+    snapDrag = null;
+    if (sh.type === 'pen' ? sh.pts.length > 2 : Math.hypot(b[0] - a[0], b[1] - a[1]) > 0.015) { snap.shapes.push(sh); snap.order = [...(snap.order || []), 'shape']; }
+    drawSnap();
+  };
+  $('#snapCanvas').addEventListener('pointerup', endSnapDrag);
+  $('#snapCanvas').addEventListener('pointercancel', endSnapDrag);
+  $('#snapUndo').onclick = () => {
+    const last = snap?.order?.pop();
+    if (last === 'pt') snap.pt = null; else if (last === 'shape') snap.shapes.pop();
+    drawSnap();
+  };
   $('#btnSnap').onclick = snapshot;
   $('#snapClose').onclick = () => $('#snapDlg').close();
-  $('#snapSave').onclick = () => download(snap.name, snap.jpg, 'image/jpeg');
+  $('#snapSave').onclick = async () => download(snap.name, await new Promise(res => $('#snapCanvas').toBlob(res, 'image/jpeg', 0.92)), 'image/jpeg');
   $('#snapCopy').onclick = async () => {
     // the clipboard takes PNG; the promise keeps Safari's "inside the click" rule
-    const png = new Promise(res => snap.canvas.toBlob(res, 'image/png'));
+    const png = new Promise(res => $('#snapCanvas').toBlob(res, 'image/png'));
     try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]); toast('已複製，可以直接貼到 LINE'); }
     catch { toast('這個瀏覽器不能複製圖片，請用「下載」'); }
   };
@@ -1599,9 +1652,9 @@
     return [P];
   }
   const lineW = (w, h) => Math.max(3, Math.min(w, h) * 0.008);
-  function drawShapes(ctx, w, h, shapes) {
+  function drawShapes(ctx, w, h, shapes, weight = 1) {
     if (!shapes?.length) return;
-    const lw = lineW(w, h);
+    const lw = lineW(w, h) * weight;
     ctx.lineCap = ctx.lineJoin = 'round';
     for (const [color, width] of [['rgba(255,255,255,.9)', lw * 2.2], [RED, lw]]) {
       ctx.strokeStyle = color; ctx.lineWidth = width;
@@ -1610,7 +1663,7 @@
       }
     }
   }
-  const drawMarksOn = (ctx, w, h, n) => { drawPt(ctx, w, h, n?.pt); drawShapes(ctx, w, h, n?.shapes); };
+  const drawMarksOn = (ctx, w, h, n, weight) => { drawPt(ctx, w, h, n?.pt); drawShapes(ctx, w, h, n?.shapes, weight); };
   function overlay(svg) { // size an <svg> to the picture inside the <video> box
     const c = contentRect();
     Object.assign(svg.style, { left: c.x + 'px', top: c.y + 'px', width: c.w + 'px', height: c.h + 'px' });
@@ -2398,6 +2451,7 @@
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); stepRef(e.key === 'ArrowLeft' ? -1 : 1); }
       return; // Escape closes the viewer itself, not the editor behind it
     }
+    if (document.querySelector('dialog[open]')) return; // shortcuts are for the player, not a dialog on top of it
     if (editing && e.key === 'Escape') { e.preventDefault(); closeEditor(); return; }
     if (editing && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); return; }
     if (typing || $('#settings').open || !video.src) return;
