@@ -717,7 +717,8 @@
     <label>複製這段訊息貼給對方（LINE、Email 都可以）</label>
     <textarea id="shareMsg" readonly></textarea>
     <div class="bar">
-      <button id="shCopy" class="primary"><i data-ic="copy"></i>複製訊息</button>
+      <button id="shLink" class="primary"><i data-ic="link"></i>只複製連結</button>
+      <button id="shCopy"><i data-ic="copy"></i>複製訊息</button>
       <button id="shSend"><i data-ic="share"></i>分享…</button>
     </div>
     <div id="sharePin" class="shareRow" hidden></div>
@@ -2914,6 +2915,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
   };
   $('#sharePin').onclick = e => { if (e.target.dataset.pin) copyText(e.target.dataset.pin); };
   $('#shCopy').onclick = () => copyText($('#shareMsg').value);
+  $('#shLink').onclick = () => copyText($('#shareMsg').value.match(/https?:\/\/\S+/)?.[0] || '');
   $('#shSend').onclick = async () => {
     try { await navigator.share({ text: $('#shareMsg').value }); }
     catch (err) { if (err.name !== 'AbortError') copyText($('#shareMsg').value); }
@@ -2943,7 +2945,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
           <div>${sh.opens ? `打開 ${sh.opens} 次・最近 ${new Date(last.at).toLocaleString('zh-TW')}${last.place ? '・' + esc(last.place) : ''}・${esc(deviceOf(last.ua))}` : '對方還沒打開'}</div>
           <div>今天語音／AI：${sh.used}／${sh.limit} 次${sh.ownLimit ? '（這條連結自訂）' : ''} <button class="small ghost" data-act="limit">改次數</button></div>
           <div class="prog">${progressText(sh)}</div>
-          <div class="bar"><button data-act="notify" class="primary">${ic('copy')}複製通知</button><button data-act="copy">複製邀請</button><button data-act="due">${sh.due ? '改期限' : '設期限'}</button>${sh.used >= sh.limit ? `<button data-act="more">今天再加 ${sh.limit} 次</button>` : ''}<button data-act="revoke">取消分享</button></div>
+          <div class="bar"><button data-act="link" class="primary">${ic('link')}複製連結</button><button data-act="notify">複製通知</button><button data-act="copy">複製邀請</button><button data-act="due">${sh.due ? '改期限' : '設期限'}</button>${sh.used >= sh.limit ? `<button data-act="more">今天再加 ${sh.limit} 次</button>` : ''}<button data-act="revoke">取消分享</button></div>
         </div>`;
       }).join('') : '還沒有分享給任何人。';
     } catch (err) { box.textContent = '讀取失敗：' + err.message; }
@@ -2955,6 +2957,7 @@ ${D.timed.map(n => { const sh = shots[n.id], tall = sh && sh.h > sh.w;
     const sh = shareRows.find(x => x.id === d.id);
     if (act === 'copy') copyText(shareMessage(d.label, d.token, +d.expires, !!d.pin, sh?.due));
     if (act === 'notify' && sh) copyText(notifyMessage(sh));
+    if (act === 'link') copyText(shareUrl(d.token));
     if (act === 'limit' && sh) {
       const v = prompt(`這條連結每天可以用幾次語音辨識／AI 潤飾？（1～1000；留空 = 跟設定一樣，目前 ${api.limit} 次）`, sh.ownLimit || '');
       if (v === null) return;
