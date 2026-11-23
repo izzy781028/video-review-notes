@@ -337,8 +337,13 @@
   button.toggled { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-soft); }
   #btnRate { font-variant-numeric: tabular-nums; min-width: 44px; }
   #btnAddVoice { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-  .pt { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 3px solid #ef4444; border-radius: 50%;
-    box-shadow: 0 0 0 2px rgba(255,255,255,.85); pointer-events: none; }
+  .pt { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border: 3px solid var(--mark, #ef4444); border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--halo, rgba(255,255,255,.85)); pointer-events: none; }
+  /* colour of new marks: red by default; another colour stands out on a red picture */
+  .swatches { display: inline-flex; gap: 4px; align-items: center; }
+  .sw { width: 22px; height: 22px; min-height: 22px !important; padding: 0; border-radius: 50%; background: var(--c); border: 2px solid var(--glass-border); box-shadow: none; flex: none; }
+  .sw.on { outline: 2px solid var(--ink); outline-offset: 2px; }
+  @media (pointer: coarse) { .sw { width: 28px; height: 28px; min-height: 28px !important; } }
   /* status, chips, alerts, toast */
   .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); color: var(--accent); border-radius: 999px;
     padding: 2px 9px; font-size: 11.5px; white-space: nowrap; }
@@ -578,6 +583,7 @@
                 <button data-tool="box" title="在畫面上拖曳畫方框"><i data-ic="box"></i>方框</button>
                 <button data-tool="pen" title="在畫面上自由畫線"><i data-ic="pen"></i>手繪</button>
               </span>
+              <span class="swatches" role="radiogroup" aria-label="標記顏色"><button type="button" class="sw" data-color="#ef4444" style="--c:#ef4444" title="紅色" aria-label="紅色"></button><button type="button" class="sw" data-color="#facc15" style="--c:#facc15" title="黃色" aria-label="黃色"></button><button type="button" class="sw" data-color="#22d3ee" style="--c:#22d3ee" title="青色" aria-label="青色"></button><button type="button" class="sw" data-color="#22c55e" style="--c:#22c55e" title="綠色" aria-label="綠色"></button><button type="button" class="sw" data-color="#ffffff" style="--c:#ffffff" title="白色" aria-label="白色"></button></span>
               <button id="btnUndoDraw" class="ghost small" title="移除最後一個標記"><i data-ic="undo"></i>復原</button>
               <button id="btnOut" class="ghost small" title="播放或拖時間軸到結束的地方，再按這裡：這則意見就涵蓋一整段"><i data-ic="range"></i>設結束點</button>
               <button id="btnOutClear" class="ghost small" hidden>取消範圍</button>
@@ -741,6 +747,7 @@
       <button data-stool="pen"><i data-ic="pen"></i>手繪</button>
       <button data-stool="pt"><i data-ic="target"></i>圈選</button>
     </span>
+    <span class="swatches" role="radiogroup" aria-label="標記顏色"><button type="button" class="sw" data-color="#ef4444" style="--c:#ef4444" title="紅色" aria-label="紅色"></button><button type="button" class="sw" data-color="#facc15" style="--c:#facc15" title="黃色" aria-label="黃色"></button><button type="button" class="sw" data-color="#22d3ee" style="--c:#22d3ee" title="青色" aria-label="青色"></button><button type="button" class="sw" data-color="#22c55e" style="--c:#22c55e" title="綠色" aria-label="綠色"></button><button type="button" class="sw" data-color="#ffffff" style="--c:#ffffff" title="白色" aria-label="白色"></button></span>
     <button id="snapUndo" class="ghost small"><i data-ic="undo"></i>復原</button>
   </div>
   <canvas id="snapCanvas" aria-label="截圖，可以在上面畫標記"></canvas>
@@ -1187,9 +1194,9 @@
     if (!snap) return;
     e.preventDefault();
     const p = snapAt(e);
-    if (snapTool === 'pt') { snap.pt = { x: p[0], y: p[1] }; snap.order = [...(snap.order || []), 'pt']; drawSnap(); return; }
+    if (snapTool === 'pt') { snap.pt = { x: p[0], y: p[1], ...withColor() }; snap.order = [...(snap.order || []), 'pt']; drawSnap(); return; }
     $('#snapCanvas').setPointerCapture(e.pointerId);
-    snapDrag = { type: snapTool, pts: [p] };
+    snapDrag = { type: snapTool, pts: [p], ...withColor() };
     if (snapTool !== 'pen') snapDrag.pts.push(p.slice());
   });
   $('#snapCanvas').addEventListener('pointermove', e => {
@@ -1623,6 +1630,8 @@
     if (!pt) { el.hidden = true; return; }
     const c = contentRect();
     el.style.left = c.x + pt.x * c.w + 'px'; el.style.top = c.y + pt.y * c.h + 'px'; el.hidden = false;
+    const color = /^#[0-9a-f]{6}$/i.test(pt.color || '') ? pt.color : RED;
+    el.style.setProperty('--mark', color); el.style.setProperty('--halo', haloOf(color));
   }
   function refreshPt() {
     const n = editing ? ($('#edGeneral').checked ? null : editing) : notes.find(x => x.id === activeId);
@@ -1631,15 +1640,26 @@
     showShapes(here ? n.shapes : null);
     showSafe(); placeTags();
   }
+  // white marks get a dark edge, every other colour a white one, so a mark shows on any picture
+  const haloOf = c => String(c || '').toLowerCase() === '#ffffff' ? 'rgba(0,0,0,.7)' : 'rgba(255,255,255,.9)';
   function drawPt(ctx, w, h, pt) {
     if (!pt) return;
-    const r = Math.max(10, w * 0.035), x = pt.x * w, y = pt.y * h;
+    const r = Math.max(10, w * 0.035), x = pt.x * w, y = pt.y * h, color = pt.color || RED;
     ctx.lineWidth = Math.max(3, r * 0.22);
-    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(x, y, r + ctx.lineWidth * 0.8, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = '#ef4444'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = haloOf(color); ctx.beginPath(); ctx.arc(x, y, r + ctx.lineWidth * 0.8, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
   }
   // arrows, boxes and freehand lines, stored as 0..1 coordinates of the picture
   const RED = '#ef4444';
+  // the colour for new marks (remembered on this device); red is the default and is not stored on the mark
+  let markColor = store.get('vrn.markColor', RED);
+  const withColor = () => markColor !== RED ? { color: markColor } : {};
+  function showSwatches() { document.querySelectorAll('.sw').forEach(b => { b.classList.toggle('on', b.dataset.color === markColor); b.setAttribute('aria-checked', b.dataset.color === markColor); b.setAttribute('role', 'radio'); }); }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.sw'); if (!b) return;
+    markColor = b.dataset.color; store.set('vrn.markColor', markColor); showSwatches();
+  });
+  showSwatches();
   let drawTool = 'pt', drag = null;
   function shapeLines(sh, w, h) {
     const P = sh.pts.map(([x, y]) => [x * w, y * h]);
@@ -1656,11 +1676,9 @@
     if (!shapes?.length) return;
     const lw = lineW(w, h) * weight;
     ctx.lineCap = ctx.lineJoin = 'round';
-    for (const [color, width] of [['rgba(255,255,255,.9)', lw * 2.2], [RED, lw]]) {
-      ctx.strokeStyle = color; ctx.lineWidth = width;
-      for (const sh of shapes) for (const line of shapeLines(sh, w, h)) {
-        ctx.beginPath(); line.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
-      }
+    for (const pass of ['halo', 'line']) for (const sh of shapes) { // all edges first, so a crossing line never cuts another's colour
+      ctx.strokeStyle = pass === 'halo' ? haloOf(sh.color || RED) : sh.color || RED; ctx.lineWidth = pass === 'halo' ? lw * 2.2 : lw;
+      for (const line of shapeLines(sh, w, h)) { ctx.beginPath(); line.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); }
     }
   }
   const drawMarksOn = (ctx, w, h, n, weight) => { drawPt(ctx, w, h, n?.pt); drawShapes(ctx, w, h, n?.shapes, weight); };
@@ -1674,9 +1692,10 @@
     const svg = $('#draw');
     if (!shapes?.length) { svg.toggleAttribute('hidden', true); svg.innerHTML = ''; return; }
     const c = overlay(svg), lw = lineW(c.w, c.h);
-    const d = shapes.flatMap(sh => shapeLines(sh, c.w, c.h)).map(l => 'M' + l.map(p => p.map(v => v.toFixed(1)).join(' ')).join('L')).join('');
-    svg.innerHTML = [['rgba(255,255,255,.9)', lw * 2.2], [RED, lw]].map(([color, width]) =>
-      `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
+    const path = sh => shapeLines(sh, c.w, c.h).map(l => 'M' + l.map(p => p.map(v => v.toFixed(1)).join(' ')).join('L')).join('');
+    const col = sh => /^#[0-9a-f]{6}$/i.test(sh.color || '') ? sh.color : RED;
+    svg.innerHTML = ['halo', 'line'].map(pass => shapes.map(sh =>
+      `<path d="${path(sh)}" fill="none" stroke="${pass === 'halo' ? haloOf(col(sh)) : col(sh)}" stroke-width="${pass === 'halo' ? lw * 2.2 : lw}" stroke-linecap="round" stroke-linejoin="round"/>`).join('')).join('');
     svg.toggleAttribute('hidden', false);
   }
   const normAt = e => { const c = contentRect(), sr = $('#stage').getBoundingClientRect(); return [(e.clientX - sr.left - c.x) / c.w, (e.clientY - sr.top - c.y) / c.h]; };
@@ -1689,7 +1708,7 @@
     if (drawTool === 'pt') { tapAt = { x, y, cx: e.clientX, cy: e.clientY, id: e.pointerId }; return; } // set on release, unless it became a scroll
     e.preventDefault();
     $('#stageHit').setPointerCapture(e.pointerId);
-    drag = { type: drawTool, pts: [[clamp01(x), clamp01(y)]] };
+    drag = { type: drawTool, pts: [[clamp01(x), clamp01(y)]], ...withColor() };
     if (drawTool !== 'pen') drag.pts.push(drag.pts[0].slice());
   });
   $('#stageHit').addEventListener('pointermove', e => {
@@ -1710,7 +1729,7 @@
   $('#stageHit').addEventListener('pointerup', e => {
     const t = tapAt; tapAt = null;
     if (t && editing && t.id === e.pointerId && Math.hypot(e.clientX - t.cx, e.clientY - t.cy) < 12) {
-      editing.pt = { x: clamp01(t.x), y: clamp01(t.y) }; marksChanged();
+      editing.pt = { x: clamp01(t.x), y: clamp01(t.y), ...withColor() }; marksChanged();
     }
     endDrag();
   });
