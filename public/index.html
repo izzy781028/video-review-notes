@@ -520,6 +520,7 @@
         <button id="fpsBadge" class="small muted" title="更改 FPS / 起始時間碼" style="border:0;background:none;padding:0"></button>
         <span class="spacer" style="flex:1"></span>
         <span id="srcName" class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%"></span>
+        <button id="btnSnap" class="small" title="把目前這一格存成圖片（S）"><i data-ic="camera"></i>截圖</button>
         <button id="btnShare" class="small primary ownerSrv" hidden><i data-ic="link"></i>分享給外部審片</button>
         <button id="btnChange" class="small ownerOnly">換影片</button>
       </div>
@@ -556,6 +557,7 @@
         <span class="hk"><kbd>I</kbd><kbd>O</kbd><span>標出區段</span></span>
         <span class="hk"><kbd>[</kbd><kbd>]</kbd><span>上／下一則</span></span>
         <span class="hk"><kbd>N</kbd><span>下一則未處理</span></span>
+        <span class="hk"><kbd>S</kbd><span>截圖</span></span>
       </div>
 
       <div id="editor" class="panel">
@@ -728,6 +730,14 @@
   <div class="bar"><span class="spacer" style="flex:1"></span><button id="shClose">關閉</button></div>
 </dialog>
 
+<dialog id="snapDlg">
+  <h3 style="margin-top:0" class="iconLabel"><i data-ic="camera"></i>截圖</h3>
+  <img id="snapImg" alt="目前這一格" style="display:block; width:100%; max-height:55vh; object-fit:contain; border-radius:12px; background:#000">
+  <div id="snapInfo" class="small muted" style="margin-top:6px"></div>
+  <div class="bar"><button id="snapClose">關閉</button><span class="spacer" style="flex:1"></span>
+    <button id="snapCopy"><i data-ic="copy"></i>複製（貼到 LINE）</button>
+    <button id="snapSave" class="primary"><i data-ic="download"></i><span>下載</span></button></div>
+</dialog>
 <dialog id="upDlg">
   <form id="upForm">
     <h3 style="margin-top:0" class="iconLabel"><i data-ic="upload"></i>上傳影片</h3>
@@ -809,6 +819,7 @@
     chevron: '<path d="M6 9l6 6 6-6"/>',
     trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
     doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+    camera: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
     image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
     print: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
     table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>',
@@ -1128,6 +1139,37 @@
     if (b.dataset.remote) openRemote(b.dataset.remote, b.dataset.name);
     if (b.dataset.file) loadUrl(driveMediaUrl(b.dataset.file), b.dataset.name, 'vrn.notes.gdrive.' + b.dataset.file);
   });
+  // ---------- 截圖: the current frame at full resolution, to download, copy or share ----------
+  let snap = null;
+  async function snapshot() {
+    if (!video.src || !video.videoWidth) { toast('影片還沒載入'); return; }
+    video.pause(); stopShuttle();
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0);
+    const tc = tcOf(video.currentTime);
+    let jpg;
+    try { jpg = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(), 'image/jpeg', 0.92)); }
+    catch { toast('這個影片來源不允許截圖'); return; } // a video from another site without CORS
+    if (snap?.url) URL.revokeObjectURL(snap.url);
+    snap = { canvas: c, jpg, url: URL.createObjectURL(jpg), name: `${videoName.replace(/\.[^.]+$/, '') || '影片'}_${tc.replace(/[:;]/g, '-')}.jpg`, tc };
+    $('#snapImg').src = snap.url;
+    $('#snapInfo').textContent = `${tc}・${c.width}×${c.height}`;
+    // on a phone 下載 opens the share sheet (save to Photos, LINE…), like the other exports
+    $('#snapSave').lastElementChild.textContent = matchMedia('(pointer: coarse)').matches ? '存到手機／分享' : '下載';
+    $('#snapCopy').hidden = !(navigator.clipboard?.write && window.ClipboardItem);
+    $('#snapDlg').showModal();
+  }
+  $('#btnSnap').onclick = snapshot;
+  $('#snapClose').onclick = () => $('#snapDlg').close();
+  $('#snapSave').onclick = () => download(snap.name, snap.jpg, 'image/jpeg');
+  $('#snapCopy').onclick = async () => {
+    // the clipboard takes PNG; the promise keeps Safari's "inside the click" rule
+    const png = new Promise(res => snap.canvas.toBlob(res, 'image/png'));
+    try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]); toast('已複製，可以直接貼到 LINE'); }
+    catch { toast('這個瀏覽器不能複製圖片，請用「下載」'); }
+  };
+
   // ---------- uploading into the review folder (owner; goes through the Drive helper) ----------
   let folderFiles = [], upFile = null, upping = null;
   const NAME_RULE = /^\d{8}_[^/\\]+_(v\d+|[A-Z][ _-]?copy|Final([ _-]?v?\d+)?)([ _-]?內部)?\.(mp4|mov|m4v)$/i;
@@ -2372,6 +2414,7 @@
       case 'j': case 'J': e.preventDefault(); shuttleBack(); break;
       case '[': case ']': jumpNote(e.key === ']' ? 1 : -1); break;
       case 'n': case 'N': e.preventDefault(); jumpOpen(); break;
+      case 's': case 'S': if (e.metaKey || e.ctrlKey) break; e.preventDefault(); snapshot(); break;
       case 'i': case 'I': e.preventDefault(); setMark('in'); break;
       case 'o': case 'O': e.preventDefault(); setMark('out'); break;
       default: return;
