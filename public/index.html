@@ -302,6 +302,11 @@
   .dRow.picked .dCheck { background: var(--accent); border-color: var(--accent); color: #fff; }
   #snapCanvas { display: block; max-width: 100%; max-height: 55vh; margin: 0 auto; border-radius: 12px; background: #000; touch-action: none; cursor: crosshair; }
   #snapTools button { padding: 4px 10px; }
+  /* the whole file name, on its own line (names carry the date, project and version) */
+  .srcName { display: block; width: 100%; margin: 2px 0 0; padding: 2px 0; border: 0; background: none; box-shadow: none; min-height: 0 !important;
+    text-align: left; font-size: 13px; color: var(--ink-2); white-space: normal; word-break: break-all; line-height: 1.45; cursor: copy; }
+  .srcName:empty { display: none; }
+  .srcName:hover, .srcName:focus { background: none; color: var(--ink); } .srcName:focus:not(:focus-visible) { outline: none; }
   #pickBar { position: sticky; bottom: 0; z-index: 2; margin-top: 8px; padding: 8px 10px; border-radius: 16px; background: var(--sheet-bg); border: 1px solid var(--glass-border); box-shadow: var(--shadow); }
   #pickBar .danger { background: var(--rec); color: #fff; border-color: transparent; }
   .dRow .dItem { padding-right: 48px; }
@@ -528,11 +533,11 @@
         <span id="tc">00:00:00:00</span>
         <button id="fpsBadge" class="small muted" title="更改 FPS / 起始時間碼" style="border:0;background:none;padding:0"></button>
         <span class="spacer" style="flex:1"></span>
-        <span id="srcName" class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%"></span>
         <button id="btnSnap" class="small" title="把目前這一格存成圖片（S）"><i data-ic="camera"></i>截圖</button>
         <button id="btnShare" class="small primary ownerSrv" hidden><i data-ic="link"></i>分享給外部審片</button>
         <button id="btnChange" class="small ownerOnly">換影片</button>
       </div>
+      <button id="srcName" class="srcName" title="點一下複製檔名"></button>
       <div id="srcHint" class="small" style="color:var(--rec)"></div>
       <div class="bar ctlRow">
       <div class="transport seg">
@@ -1225,6 +1230,7 @@
     drawSnap();
   };
   $('#btnSnap').onclick = snapshot;
+  $('#srcName').onclick = () => { const t = $('#srcName').textContent; if (t) copyText(t); };
   $('#snapClose').onclick = () => $('#snapDlg').close();
   $('#snapSave').onclick = async () => download(snap.name, await new Promise(res => $('#snapCanvas').toBlob(res, 'image/jpeg', 0.92)), 'image/jpeg');
   $('#snapCopy').onclick = async () => {
